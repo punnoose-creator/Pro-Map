@@ -70,7 +70,7 @@ export default function EmployeePortal() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("fieldiq_token");
+    const token = localStorage.getItem("promap_token");
     if (!token) return;
     fetch(`${API_BASE}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -79,7 +79,7 @@ export default function EmployeePortal() {
       .then((data) => {
         if (data.success) router.replace("/dashboard");
       })
-      .catch(() => localStorage.removeItem("fieldiq_token"));
+      .catch(() => localStorage.removeItem("promap_token"));
   }, [router]);
 
   const showForgotFlow = (e: React.MouseEvent) => {
@@ -112,8 +112,8 @@ export default function EmployeePortal() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Login failed");
-      localStorage.setItem("fieldiq_token", data.token);
-      localStorage.setItem("fieldiq_user", JSON.stringify(data.employee));
+      localStorage.setItem("promap_token", data.token);
+      localStorage.setItem("promap_user", JSON.stringify(data.employee));
       setLoginAlert({
         type: "success",
         message: `Welcome back, ${data.employee.fullName}! Redirecting to dashboard...`,
@@ -189,8 +189,8 @@ export default function EmployeePortal() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Registration failed");
-      localStorage.setItem("fieldiq_token", data.token);
-      localStorage.setItem("fieldiq_user", JSON.stringify(data.employee));
+      localStorage.setItem("promap_token", data.token);
+      localStorage.setItem("promap_user", JSON.stringify(data.employee));
       setRegAlert({
         type: "success",
         message: `Account created! Welcome, ${data.employee.fullName}. Redirecting...`,
@@ -208,8 +208,9 @@ export default function EmployeePortal() {
   return (
     <PortalShell>
       <div className="mobile-brand">
-              <div className="mobile-brand-text">
-                FIELD<span>IQ</span>
+              <div className="mobile-brand-text" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <img src="/logo.png" alt="ProMap Logo" className="brand-logo" style={{ height: '40px' }} />
+                <div>PRO<span>MAP</span></div>
               </div>
             </div>
 
@@ -273,7 +274,7 @@ export default function EmployeePortal() {
                       id="login-email"
                       name="email"
                       type="email"
-                      placeholder="employee@fieldiq.ae"
+                      placeholder="employee@promap.ae"
                       required
                       autoComplete="email"
                       value={loginEmail}
@@ -354,12 +355,12 @@ export default function EmployeePortal() {
                   <span className="quick-card-name">Biometric</span>
                   <span className="quick-card-desc">Mobile Only</span>
                 </div>
-                <div className="quick-card" role="button" tabIndex={0}>
+                <div className="quick-card" role="button" tabIndex={0} onClick={() => router.push('/admin-login')}>
                   <span className="material-symbols-outlined">
-                    key_visualizer
+                    admin_panel_settings
                   </span>
-                  <span className="quick-card-name">SSO Login</span>
-                  <span className="quick-card-desc">External Vault</span>
+                  <span className="quick-card-name">Admin Portal</span>
+                  <span className="quick-card-desc">Manager Access</span>
                 </div>
               </div>
             </div>
@@ -617,7 +618,7 @@ export default function EmployeePortal() {
             </div>
 
       <footer className="form-footer">
-        <span className="footer-copyright">© 2026 FieldIQ</span>
+        <span className="footer-copyright">© 2026 ProMap</span>
         <div className="footer-links">
           <a href="#">Privacy</a>
           <a href="#">Legal</a>

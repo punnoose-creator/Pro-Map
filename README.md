@@ -1,6 +1,6 @@
-# FieldIQ
+# ProMap
 
-FieldIQ is a modern, full-stack Employee Portal and Field Management application built specifically to streamline field visits, enable voice-first logging, and track GPS metrics for agents in the field.
+ProMap is a modern, full-stack Employee Portal and Field Management application built specifically to streamline field visits, enable voice-first logging, and track GPS metrics for agents in the field.
 
 ## 🚀 Key Features
 
@@ -26,7 +26,7 @@ FieldIQ is a modern, full-stack Employee Portal and Field Management application
 ## 📂 Project Structure
 
 ```text
-FieldIQ/
+ProMap/
 ├── backend/                  # Node.js + Express API
 │   ├── models/               # MongoDB Database Schemas (Employee, LocationPing)
 │   ├── routes/               # API Endpoints (Auth, Locations)
@@ -62,7 +62,7 @@ npm install
 Create a `.env` file inside the `backend` directory and add your environment variables:
 ```env
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/fieldiq
+MONGODB_URI=mongodb://localhost:27017/promap
 JWT_SECRET=your_super_secret_key
 JWT_EXPIRES_IN=30d
 ```

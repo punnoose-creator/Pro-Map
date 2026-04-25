@@ -13,6 +13,7 @@ type Employee = {
   email?: string;
   employeeId?: string;
   department?: string;
+  role?: string;
 };
 
 type AlertState = { type: "error" | "success"; message: string } | null;
@@ -69,7 +70,7 @@ export default function DashboardPage() {
     return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
         async (pos) => {
-          const token = localStorage.getItem("fieldiq_token");
+          const token = localStorage.getItem("promap_token");
           if (!token) {
             setAlert({ type: "error", message: "Session expired. Please sign in again." });
             resolve(false);
@@ -135,7 +136,7 @@ export default function DashboardPage() {
 );
 
   useEffect(() => {
-    const token = localStorage.getItem("fieldiq_token");
+    const token = localStorage.getItem("promap_token");
     if (!token) {
       router.replace("/");
       return;
@@ -149,8 +150,8 @@ export default function DashboardPage() {
         setUser(data.employee);
       })
       .catch(() => {
-        localStorage.removeItem("fieldiq_token");
-        localStorage.removeItem("fieldiq_user");
+        localStorage.removeItem("promap_token");
+        localStorage.removeItem("promap_user");
         setBootError(true);
         router.replace("/");
       });
@@ -184,8 +185,8 @@ export default function DashboardPage() {
   function signOut() {
     clearIntervalSafe();
     setTracking(false);
-    localStorage.removeItem("fieldiq_token");
-    localStorage.removeItem("fieldiq_user");
+    localStorage.removeItem("promap_token");
+    localStorage.removeItem("promap_user");
     router.push("/");
   }
 
@@ -194,7 +195,7 @@ export default function DashboardPage() {
       <PortalShell>
         <div className="mobile-brand">
           <div className="mobile-brand-text">
-            FIELD<span>IQ</span>
+            PRO<span>MAP</span>
           </div>
         </div>
         <div className="form-header">
@@ -209,12 +210,15 @@ export default function DashboardPage() {
     <PortalShell>
       <div className="mobile-brand">
         <div className="mobile-brand-text">
-          FIELD<span>IQ</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <img src="/logo.png" alt="ProMap Logo" className="brand-logo" style={{ height: '32px' }} />
+            <div>PRO<span>MAP</span></div>
+          </div>
         </div>
       </div>
 
-      <div className="form-header">
-        <h2 className="form-title">Hello, {user.fullName}</h2>
+      <div className="form-header" style={{ marginBottom: '24px' }}>
+        <h2 className="form-title" style={{ fontSize: 'clamp(24px, 5vw, 30px)' }}>Hello, {user.fullName}</h2>
         <p className="form-subtitle">
           You&apos;re signed in. Start your shift to share an accurate GPS checkpoint
           every five minutes, or sign out when you&apos;re done.
@@ -302,10 +306,11 @@ export default function DashboardPage() {
           </span>
           <span className="btn-label">Log out</span>
         </button>
+
       </div>
 
       <footer className="form-footer">
-        <span className="footer-copyright">© 2026 FieldIQ</span>
+        <span className="footer-copyright">© 2026 ProMap</span>
         <div className="footer-links">
           <a href="#">Privacy</a>
           <a href="#">Legal</a>

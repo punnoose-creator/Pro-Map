@@ -5,6 +5,9 @@ const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
 const locationRoutes = require('./routes/locations');
+const logEntryRoutes = require('./routes/logEntry');
+const adminRoutes = require('./routes/admin');
+const summaryRoutes = require('./routes/summary');
 
 const app = express();
 
@@ -20,12 +23,15 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/log-entry', logEntryRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/summary', summaryRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
-    message: 'FieldIQ API is running',
+    message: 'ProMap API is running',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
   });
@@ -44,14 +50,14 @@ app.use((err, req, res, next) => {
 
 // Connect to MongoDB and start server
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/fieldiq';
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/promap';
 
 mongoose
   .connect(MONGO_URI)
   .then(() => {
     console.log('✅ MongoDB connected successfully');
     app.listen(PORT, () => {
-      console.log(`🚀 FieldIQ API running on http://localhost:${PORT}`);
+      console.log(`🚀 ProMap API running on http://localhost:${PORT}`);
     });
   })
   .catch((err) => {

@@ -15,9 +15,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "FieldIQ — Employee Portal",
+  title: "ProMap — Employee Portal",
   description:
-    "FieldIQ Employee Portal — Secure voice-first field visit logging for ELV sales teams.",
+    "ProMap Employee Portal — Secure voice-first field visit logging for ELV sales teams.",
 };
 
 export default function RootLayout({

@@ -22,6 +22,7 @@ frontend/.env
 # Misc
 .DS_Store
 *.pem
+backend/service-account-key.json
 
 # Debug
 npm-debug.log*

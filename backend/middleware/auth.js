@@ -1,9 +1,10 @@
 const jwt = require('jsonwebtoken');
+const Employee = require('../models/Employee');
 
 /**
- * Verifies Bearer JWT and sets req.employeeId to the decoded Mongo _id string.
+ * Verifies Bearer JWT and sets req.user to the employee document.
  */
-function protect(req, res, next) {
+async function protect(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -11,14 +12,38 @@ function protect(req, res, next) {
     }
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
     if (!decoded || !decoded.id) {
       return res.status(401).json({ success: false, message: 'Not authorized' });
     }
-    req.employeeId = decoded.id;
+
+    const employee = await Employee.findById(decoded.id);
+    if (!employee || !employee.isActive) {
+      return res.status(401).json({ success: false, message: 'User no longer exists or is inactive' });
+    }
+
+    req.user = employee;
+    req.employeeId = employee._id; // Maintain backward compatibility
     next();
-  } catch {
+  } catch (err) {
     return res.status(401).json({ success: false, message: 'Token invalid or expired' });
   }
 }
 
-module.exports = { protect };
+/**
+ * Restricts access to specific roles.
+ * @param {...string} roles - Allowed roles
+ */
+function restrictTo(...roles) {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'You do not have permission to perform this action',
+      });
+    }
+    next();
+  };
+}
+
+module.exports = { protect, restrictTo };

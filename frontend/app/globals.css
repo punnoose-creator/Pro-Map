@@ -1,4 +1,4 @@
-/* FieldIQ — design system (from legacy index.html) */
+/* ProMap — design system (from legacy index.html) */
 :root {
   --surface: #131313;
   --surface-dim: #131313;
@@ -71,6 +71,37 @@ body {
     linear-gradient(90deg, rgba(251, 201, 0, 0.03) 1px, transparent 1px);
   background-size: 60px 60px;
   animation: gridShift 20s linear infinite;
+}
+
+.portal-header {
+  display: flex;
+  justify-content: flex-end;
+  padding: 24px 32px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  z-index: 10;
+}
+
+@media (min-width: 900px) {
+  .portal-header {
+    padding-right: 64px;
+  }
+}
+
+@media (max-width: 600px) {
+  .portal-header {
+    padding: 16px;
+  }
+  .status-badge {
+    top: 16px;
+    right: 16px;
+    padding: 6px 12px;
+  }
+  .status-text {
+    font-size: 8px;
+  }
 }
 
 @keyframes gridShift {
@@ -182,10 +213,19 @@ body {
 @media (min-width: 900px) {
   .panel-left {
     display: flex;
-    flex: 0 0 55%;
+    flex: 0 0 50%;
     align-items: center;
     justify-content: center;
     padding: 64px;
+  }
+}
+
+@media (max-width: 899px) {
+  .panel-left {
+    display: none;
+  }
+  .layout {
+    flex-direction: column;
   }
 }
 
@@ -1080,6 +1120,11 @@ body {
   gap: 16px;
   margin-bottom: 32px;
 }
+@media (max-width: 500px) {
+  .meta-grid {
+    grid-template-columns: 1fr;
+  }
+}
 .meta-card {
   padding: 16px;
   background: var(--surface-high);
@@ -1142,4 +1187,13 @@ body {
   0% { transform: scale(1.0); opacity: 0.8; }
   50% { transform: scale(1.8); opacity: 0; }
   100% { transform: scale(1.0); opacity: 0; }
+}
+
+.brand-logo {
+  height: 1.2em;
+  width: auto;
+  border-radius: 15%;
+  object-fit: contain;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  background: white;
 }

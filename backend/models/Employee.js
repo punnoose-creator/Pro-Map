@@ -50,6 +50,10 @@ const employeeSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
     },
+    googleSheetId: {
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true,

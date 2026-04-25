@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 type PortalShellProps = {
   children: ReactNode;
@@ -34,8 +35,9 @@ export default function PortalShell({ children }: PortalShellProps) {
 
           <div className="panel-left-content">
             <span className="access-label">Access Point</span>
-            <h1 className="brand-headline">
-              FIELD<span>IQ</span>
+            <h1 className="brand-headline" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <img src="/logo.png" alt="ProMap Logo" className="brand-logo" />
+              <div>PRO<span>MAP</span></div>
             </h1>
             <p className="panel-tagline">
               Log every client visit in under 2 minutes. Voice-first.
@@ -63,6 +65,19 @@ export default function PortalShell({ children }: PortalShellProps) {
         </aside>
 
         <main className="panel-right">
+          <header className="portal-header">
+            <Link href="/dashboard/summary" className="profile-btn" style={{
+              display: 'flex', alignItems: 'center', gap: '8px', 
+              background: 'rgba(255, 192, 168, 0.1)', 
+              border: '1px solid rgba(255, 192, 168, 0.2)',
+              padding: '8px 16px', borderRadius: '24px',
+              color: '#ffc0a8', fontSize: '12px', fontWeight: 600,
+              textDecoration: 'none', transition: 'all 0.2s'
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>person</span>
+              <span>Daily Summary</span>
+            </Link>
+          </header>
           <div className="form-container">{children}</div>
         </main>
       </div>
