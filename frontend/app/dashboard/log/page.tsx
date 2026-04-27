@@ -120,6 +120,12 @@ export default function LogVisitPage() {
     return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
   };
 
+  const signOut = () => {
+    localStorage.removeItem("promap_token");
+    localStorage.removeItem("promap_user");
+    router.push("/");
+  };
+
   const submitLog = async () => {
     const text = notes.trim();
     if (!text) {
@@ -263,12 +269,22 @@ export default function LogVisitPage() {
           className="gold-gradient-btn"
           onClick={submitLog}
           disabled={submitting}
-          style={{ opacity: submitting ? 0.7 : 1 }}
+          style={{ opacity: submitting ? 0.7 : 1, marginBottom: '16px' }}
         >
-          {submitting ? "Saving to Sheet..." : "Submit Entry"}
+          {submitting ? "Saving Log..." : "Submit Entry"}
           <span className="material-symbols-outlined">
             {submitting ? "hourglass_empty" : "arrow_forward"}
           </span>
+        </button>
+
+        <button 
+          type="button" 
+          className="btn-secondary" 
+          onClick={signOut}
+          style={{ width: '100%', justifyContent: 'center', background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.2)', color: '#f87171' }}
+        >
+          <span className="material-symbols-outlined" style={{ marginRight: '8px' }}>logout</span>
+          Log out
         </button>
       </div>
     </PortalShell>

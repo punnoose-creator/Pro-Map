@@ -293,18 +293,12 @@ export default function DashboardPage() {
           type="button"
           className="btn-secondary"
           onClick={() => router.push("/dashboard/log")}
+          style={{ width: '100%', marginBottom: '12px' }}
         >
           <span className="material-symbols-outlined btn-secondary-icon">
-            edit_note
+            mic
           </span>
-          <span className="btn-label">Log Visit</span>
-        </button>
-
-        <button type="button" className="btn-secondary" onClick={signOut}>
-          <span className="material-symbols-outlined btn-secondary-icon">
-            logout
-          </span>
-          <span className="btn-label">Log out</span>
+          <span className="btn-label">Speak / Log Visit</span>
         </button>
 
       </div>

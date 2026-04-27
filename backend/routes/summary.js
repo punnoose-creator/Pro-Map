@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
 const { generateDailySummary } = require('../lib/groqParser');
-const { appendRow, getRows } = require('../lib/sheetsClient');
+const LogEntry = require('../models/LogEntry');
 
 /**
  * GET /api/summary/generate
@@ -13,16 +13,12 @@ router.get('/generate', protect, async (req, res) => {
     const employeeName = req.user.fullName;
     const today = new Date().toISOString().split('T')[0];
 
-    // Fetch all rows from Daily Log
-    const rows = await getRows('Daily Log', req.user.googleSheetId);
-    if (rows.length < 5) {
-      return res.json({ success: true, summary: "No field visits logged yet today to summarize." });
-    }
-
-    // Daily Log loggedBy is at index 16 (Q) and date is at index 0 (A)
-    const todaysLogs = rows.filter(
-      (row) => row[16] === employeeName && row[0] === today
-    );
+    // Fetch all logs for today from DB
+    const todaysLogs = await LogEntry.find({
+      employee: req.user._id,
+      date: today,
+      category: { $ne: 'Daily Summary' } // Don't summarize previous summaries
+    });
 
     if (todaysLogs.length === 0) {
       return res.json({ success: true, summary: "No field visits logged yet today to summarize." });
@@ -40,7 +36,7 @@ router.get('/generate', protect, async (req, res) => {
 
 /**
  * POST /api/summary/save
- * Saves the finalized daily summary to the Google Sheet.
+ * Saves the finalized daily summary to the DB.
  */
 router.post('/save', protect, async (req, res) => {
   try {
@@ -49,13 +45,15 @@ router.post('/save', protect, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Summary text cannot be empty' });
     }
 
-    const employeeName = req.user.fullName;
     const today = new Date().toISOString().split('T')[0];
 
-    // Append to a "Daily Summaries" tab
-    // We assume column order: Date, Employee Name, Summary Text
-    const rowValues = [today, employeeName, summary.trim()];
-    await appendRow('Daily Summaries', rowValues, req.user.googleSheetId);
+    // Save as a LogEntry with category 'Daily Summary'
+    await LogEntry.create({
+      employee: req.user._id,
+      category: 'Daily Summary',
+      date: today,
+      summaryText: summary.trim(),
+    });
 
     res.json({ success: true, message: 'Daily summary saved successfully.' });
   } catch (err) {

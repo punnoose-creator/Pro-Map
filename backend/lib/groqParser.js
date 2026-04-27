@@ -91,15 +91,27 @@ async function parseLogEntry(text) {
  */
 async function generateDailySummary(logs, employeeName, date) {
   // Extract useful info from logs to feed to LLM
-  const simplifiedLogs = logs.map(row => ({
-    timeOrRow: row[0], // Date/time
-    activity: row[1], // Activity Type
-    company: row[2], // Company
-    contact: row[3], // Contact Person
-    purpose: row[6], // Purpose
-    outcome: row[9], // Key Outcome
-    nextAction: row[12], // Next Action
-  }));
+  // Handle both DB objects and Sheet row arrays
+  const simplifiedLogs = logs.map(log => {
+    if (Array.isArray(log)) {
+      return {
+        activity: log[1],
+        company: log[2],
+        contact: log[3],
+        purpose: log[6],
+        outcome: log[9],
+        nextAction: log[12],
+      };
+    }
+    return {
+      activity: log.activityType,
+      company: log.company,
+      contact: log.contactPerson,
+      purpose: log.purpose,
+      outcome: log.keyOutcome || log.outcome,
+      nextAction: log.nextAction,
+    };
+  });
 
   const prompt = `You are an assistant for an ELV systems company.
 Please summarize the following field visits for ${employeeName} on ${date}.

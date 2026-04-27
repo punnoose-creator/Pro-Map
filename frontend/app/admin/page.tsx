@@ -16,6 +16,7 @@ type Employee = {
 type Stats = {
   activeInField: number;
   totalPings: number;
+  totalLogsToday: number;
 };
 
 export default function AdminDashboard() {
@@ -77,6 +78,15 @@ export default function AdminDashboard() {
           <div className="stat-info">
             <div className="stat-label">GPS Pings (Today)</div>
             <div className="stat-value">{stats?.totalPings || 0}</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon-box">
+            <span className="material-symbols-outlined">description</span>
+          </div>
+          <div className="stat-info">
+            <div className="stat-label">Logs Submitted (Today)</div>
+            <div className="stat-value">{stats?.totalLogsToday || 0}</div>
           </div>
         </div>
         <div className="stat-card">

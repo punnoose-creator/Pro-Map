@@ -108,11 +108,11 @@ export default function TrackingPage() {
         <div className="activity-column">
           <div className="card-header">
             <span className="material-symbols-outlined">description</span>
-            Google Sheets Activity
+            Field Activity Logs
           </div>
           <div className="activity-list">
             {activity.length === 0 ? (
-              <div className="no-activity">No logs found in Google Sheets for this employee.</div>
+              <div className="no-activity">No logs found in the database for this employee.</div>
             ) : (
               activity.map((act, idx) => (
                 <div key={idx} className="activity-item">

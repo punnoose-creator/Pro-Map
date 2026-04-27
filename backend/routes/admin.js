@@ -3,7 +3,7 @@ const router = express.Router();
 const { protect, restrictTo } = require('../middleware/auth');
 const Employee = require('../models/Employee');
 const LocationPing = require('../models/LocationPing');
-const { getRows } = require('../lib/sheetsClient');
+const LogEntry = require('../models/LogEntry');
 
 // All routes here are restricted to admin/manager
 router.use(protect, restrictTo('admin', 'manager'));
@@ -27,6 +27,7 @@ router.get('/employees', async (req, res) => {
  */
 router.get('/stats', async (req, res) => {
   try {
+    const todayStr = new Date().toISOString().split('T')[0];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -38,11 +39,17 @@ router.get('/stats', async (req, res) => {
       createdAt: { $gte: today }
     });
 
+    const totalLogsToday = await LogEntry.countDocuments({
+      date: todayStr,
+      category: { $ne: 'Daily Summary' }
+    });
+
     res.json({
       success: true,
       stats: {
         activeInField: activeEmployees.length,
         totalPings: totalPingsToday,
+        totalLogsToday: totalLogsToday,
       }
     });
   } catch (err) {
@@ -77,48 +84,39 @@ router.get('/locations/:employeeId', async (req, res) => {
 
 /**
  * GET /api/admin/activity/:employeeName
- * Fetch logs from Google Sheet for a specific employee
+ * Fetch logs from MongoDB for a specific employee
  */
 router.get('/activity/:employeeName', async (req, res) => {
   try {
     const { employeeName } = req.params;
     
-    // Find employee to get their specific sheet ID
+    // Find employee first
     const employee = await Employee.findOne({ fullName: employeeName });
-    const sheetId = employee?.googleSheetId;
-
-    const tabs = ['Daily Log', 'Inquiry & Proposals', 'Win-Loss Register', 'Pending Follow-ups'];
-    let allActivity = [];
-
-    for (const tab of tabs) {
-      const rows = await getRows(tab, sheetId);
-      if (rows.length < 5) continue; // Skip if only headers
-
-      // Logged By column index varies by sheet
-      let loggedByIdx;
-      if (tab === 'Daily Log') loggedByIdx = 16; // Q
-      else if (tab === 'Inquiry & Proposals') loggedByIdx = 18; // S
-      else if (tab === 'Win-Loss Register') loggedByIdx = 14; // O
-      else if (tab === 'Pending Follow-ups') loggedByIdx = 10; // K
-
-      const employeeRows = rows.filter(row => row[loggedByIdx] === employeeName);
-      
-      employeeRows.forEach(row => {
-        allActivity.push({
-          tab,
-          date: row[0],
-          company: row[2],
-          purpose: tab === 'Daily Log' ? row[6] : row[6], // Simplified
-          outcome: row[9] || '',
-          nextAction: tab === 'Daily Log' ? row[12] : row[17],
-        });
-      });
+    if (!employee) {
+      return res.status(404).json({ success: false, message: 'Employee not found' });
     }
 
-    res.json({ success: true, activity: allActivity });
+    // Fetch all logs for this employee
+    const entries = await LogEntry.find({ employee: employee._id })
+      .sort({ date: -1, createdAt: -1 });
+
+    const activity = entries.map(entry => ({
+      _id: entry._id,
+      tab: entry.category,
+      date: entry.date,
+      company: entry.company || 'N/A',
+      purpose: entry.purpose || entry.summaryText || 'N/A',
+      outcome: entry.keyOutcome || entry.outcome || 'N/A',
+      nextAction: entry.nextAction || 'N/A',
+      rawText: entry.rawText,
+      estValue: entry.estValueAED || entry.proposalValueAED || entry.wonValue || 0,
+    }));
+
+    res.json({ success: true, activity });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
 module.exports = router;
+
