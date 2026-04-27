@@ -20,6 +20,7 @@ export default function LogVisitPage() {
   } | null>(null);
   
   const recognitionRef = useRef<any>(null);
+  const isRecordingRef = useRef(false);
 
   useEffect(() => {
     // Get user from local storage
@@ -71,38 +72,51 @@ export default function LogVisitPage() {
       };
 
       recognitionRef.current.onend = () => {
-        setIsRecording(false);
+        // Use ref to check if we SHOULD be recording
+        if (isRecordingRef.current) {
+          try {
+            recognitionRef.current.start();
+          } catch (e) {
+            console.error("Auto-restart failed:", e);
+            setIsRecording(false);
+            isRecordingRef.current = false;
+          }
+        } else {
+          setIsRecording(false);
+          isRecordingRef.current = false;
+        }
       };
     }
   }, []);
 
   const toggleRecording = async () => {
     if (isRecording) {
+      isRecordingRef.current = false;
       recognitionRef.current?.stop();
       setIsRecording(false);
       setInterimNote(""); // Clear interim note when stopping
     } else {
       if (recognitionRef.current) {
         try {
-          // Request permission explicitly. Web Speech API requires permission, but leaving 
-          // this stream open can cause a device lock on Windows, resulting in a 'network' error.
+          // Request permission explicitly.
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           // Stop the tracks immediately so SpeechRecognition can use the mic.
           stream.getTracks().forEach(track => track.stop());
           
+          isRecordingRef.current = true;
           recognitionRef.current.start();
           setIsRecording(true);
         } catch (err) {
           console.error("Mic permission or start error:", err);
-          // If starting fails after stopping the stream, it might be the Web Speech API itself
           if (err instanceof DOMException && err.name === 'NotAllowedError') {
              alert("Please grant microphone permissions to use voice recording.");
           } else {
-             // Fallback to start blindly if getUserMedia fails
              try {
+                isRecordingRef.current = true;
                 recognitionRef.current.start();
                 setIsRecording(true);
              } catch(fallbackErr) {
+                isRecordingRef.current = false;
                 alert("Could not start voice recognition. Please ensure you have internet access and a working microphone.");
              }
           }
