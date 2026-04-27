@@ -8,6 +8,7 @@ const locationRoutes = require('./routes/locations');
 const logEntryRoutes = require('./routes/logEntry');
 const adminRoutes = require('./routes/admin');
 const summaryRoutes = require('./routes/summary');
+const shiftRoutes = require('./routes/shifts');
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use('/api/locations', locationRoutes);
 app.use('/api/log-entry', logEntryRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/summary', summaryRoutes);
+app.use('/api/shifts', shiftRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -4,6 +4,7 @@ const { protect, restrictTo } = require('../middleware/auth');
 const Employee = require('../models/Employee');
 const LocationPing = require('../models/LocationPing');
 const LogEntry = require('../models/LogEntry');
+const Shift = require('../models/Shift');
 
 // All routes here are restricted to admin/manager
 router.use(protect, restrictTo('admin', 'manager'));
@@ -76,7 +77,25 @@ router.get('/locations/:employeeId', async (req, res) => {
       createdAt: { $gte: queryDate, $lte: endDate }
     }).sort({ createdAt: 1 });
 
-    res.json({ success: true, pings });
+    // Calculate Working Hours for the day
+    const dayStr = queryDate.toISOString().split('T')[0];
+    const shifts = await Shift.find({
+      employee: employeeId,
+      date: dayStr
+    });
+
+    let totalMinutes = 0;
+    shifts.forEach(shift => {
+      const start = new Date(shift.startTime);
+      const end = shift.endTime ? new Date(shift.endTime) : (dayStr === new Date().toISOString().split('T')[0] ? new Date() : new Date(shift.startTime).setHours(23,59,59,999));
+      totalMinutes += Math.max(0, Math.round((new Date(end).getTime() - start.getTime()) / 60000));
+    });
+
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    const workTime = `${hours}h ${mins}m`;
+
+    res.json({ success: true, pings, workTime });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -104,6 +123,7 @@ router.get('/activity/:employeeName', async (req, res) => {
       _id: entry._id,
       tab: entry.category,
       date: entry.date,
+      createdAt: entry.createdAt,
       company: entry.company || 'N/A',
       purpose: entry.purpose || entry.summaryText || 'N/A',
       outcome: entry.keyOutcome || entry.outcome || 'N/A',
@@ -113,6 +133,57 @@ router.get('/activity/:employeeName', async (req, res) => {
     }));
 
     res.json({ success: true, activity });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/summaries/:employeeId
+ * Fetch Daily, Weekly, and Monthly summaries for an employee based on a reference date.
+ */
+router.get('/summaries/:employeeId', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const { date } = req.query; // YYYY-MM-DD
+    const { generatePeriodSummary } = require('../lib/groqParser');
+
+    const refDate = date ? new Date(date) : new Date();
+    const employee = await Employee.findById(employeeId);
+    if (!employee) return res.status(404).json({ success: false, message: 'Employee not found' });
+
+    // Helper to get logs for a range
+    const getLogs = async (daysBack) => {
+      const start = new Date(refDate);
+      start.setDate(start.getDate() - daysBack);
+      start.setHours(0, 0, 0, 0);
+      
+      const end = new Date(refDate);
+      end.setHours(23, 59, 59, 999);
+
+      return await LogEntry.find({
+        employee: employeeId,
+        createdAt: { $gte: start, $lte: end },
+        category: { $ne: 'Daily Summary' }
+      }).sort({ createdAt: 1 });
+    };
+
+    // 1. Daily
+    const dailyLogs = await getLogs(0);
+    const daily = await generatePeriodSummary(dailyLogs, employee.fullName, 'Daily');
+
+    // 2. Weekly
+    const weeklyLogs = await getLogs(7);
+    const weekly = await generatePeriodSummary(weeklyLogs, employee.fullName, 'Weekly');
+
+    // 3. Monthly
+    const monthlyLogs = await getLogs(30);
+    const monthly = await generatePeriodSummary(monthlyLogs, employee.fullName, 'Monthly');
+
+    res.json({
+      success: true,
+      summaries: { daily, weekly, monthly }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

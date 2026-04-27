@@ -135,4 +135,49 @@ ${JSON.stringify(simplifiedLogs, null, 2)}`;
   return raw.trim();
 }
 
-module.exports = { parseLogEntry, generateDailySummary };
+/**
+ * Generates a summary for an employee based on their logs for a specific period.
+ * @param {any[]} logs - Array of LogEntry objects
+ * @param {string} employeeName - Name of the employee
+ * @param {string} periodName - Name of the period (e.g., "Daily", "Weekly", "Monthly")
+ * @returns {Promise<string>} Summary paragraph
+ */
+async function generatePeriodSummary(logs, employeeName, periodName) {
+  if (!logs || logs.length === 0) {
+    return `No field activity logged for this ${periodName.toLowerCase()} period.`;
+  }
+
+  const simplifiedLogs = logs.map(log => ({
+    activity: log.activityType,
+    company: log.company,
+    contact: log.contactPerson,
+    purpose: log.purpose,
+    outcome: log.keyOutcome || log.outcome,
+    nextAction: log.nextAction,
+    date: log.date,
+  }));
+
+  const prompt = `You are an assistant for an ELV systems company.
+Please write a professional ${periodName} summary for ${employeeName}.
+The period includes logs from ${simplifiedLogs[0].date} to ${simplifiedLogs[simplifiedLogs.length - 1].date}.
+Focus on identifying trends, key clients visited multiple times, significant outcomes, and high-priority next actions.
+Write a concise, professional paragraph.
+Do not use markdown, just plain text.
+
+Logs:
+${JSON.stringify(simplifiedLogs, null, 2)}`;
+
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.1-8b-instant',
+    messages: [
+      { role: 'user', content: prompt },
+    ],
+    temperature: 0.3,
+    max_tokens: 500,
+  });
+
+  const raw = completion.choices[0]?.message?.content;
+  return raw ? raw.trim() : 'Failed to generate summary.';
+}
+
+module.exports = { parseLogEntry, generateDailySummary, generatePeriodSummary };

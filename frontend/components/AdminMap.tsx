@@ -24,6 +24,7 @@ type Ping = {
 
 type Props = {
   pings: Ping[];
+  focusedLocation?: [number, number] | null;
 };
 
 function ChangeView({ center }: { center: [number, number] }) {
@@ -32,7 +33,7 @@ function ChangeView({ center }: { center: [number, number] }) {
   return null;
 }
 
-export default function AdminMap({ pings }: Props) {
+export default function AdminMap({ pings, focusedLocation }: Props) {
   if (!pings || pings.length === 0) {
     return (
       <div className="no-map-data">
@@ -57,7 +58,7 @@ export default function AdminMap({ pings }: Props) {
   }
 
   const positions: [number, number][] = pings.map(p => [p.latitude, p.longitude]);
-  const center = positions[positions.length - 1]; // Center on last known position
+  const center = focusedLocation || positions[positions.length - 1]; // Center on focus or last known position
 
   return (
     <div className="map-wrapper">
@@ -69,8 +70,8 @@ export default function AdminMap({ pings }: Props) {
       >
         <ChangeView center={center} />
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.google.com/help/legalnotices_maps/">Google Maps</a>'
+          url="https://mt1.google.com/vt/lyrs=r&x={x}&y={y}&z={z}&hl=en"
           className="map-tiles"
         />
         
@@ -115,6 +116,9 @@ export default function AdminMap({ pings }: Props) {
       <style jsx global>{`
         .leaflet-container {
           background: #0a0a0a !important;
+        }
+        .map-tiles {
+          filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
         }
         .numbered-marker {
           background: none;

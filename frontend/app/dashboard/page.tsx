@@ -165,17 +165,44 @@ export default function DashboardPage() {
     setStarting(true);
     setAlert(null);
     const ok = await sendLocationPing();
+    if (!ok) {
+      setStarting(false);
+      return;
+    }
+
+    // Notify backend about shift start
+    try {
+      const token = localStorage.getItem("promap_token");
+      await fetch(`${API_BASE}/shifts/start`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (e) {
+      console.error("Shift start error", e);
+    }
+
     setStarting(false);
-    if (!ok) return;
     setTracking(true);
     intervalRef.current = setInterval(() => {
       void sendLocationPing({ silentSuccess: true });
     }, PING_INTERVAL_MS);
   }
 
-  function stopWork() {
+  async function stopWork() {
     clearIntervalSafe();
     setTracking(false);
+
+    // Notify backend about shift stop
+    try {
+      const token = localStorage.getItem("promap_token");
+      await fetch(`${API_BASE}/shifts/stop`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (e) {
+      console.error("Shift stop error", e);
+    }
+
     setAlert({
       type: "success",
       message: "Shift paused. Location updates stopped.",
