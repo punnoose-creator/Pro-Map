@@ -166,6 +166,14 @@ export default function LogVisitPage() {
 
       setSubmitResult({ success: true, message: data.message, sheet: data.sheet, parsed: data.parsed });
       setNotes("");
+      setInterimNote("");
+      
+      // Also stop recording if active
+      if (isRecordingRef.current) {
+        isRecordingRef.current = false;
+        recognitionRef.current?.stop();
+        setIsRecording(false);
+      }
     } catch (err: any) {
       setSubmitResult({ success: false, message: err.message || "Something went wrong. Please try again." });
     } finally {
