@@ -42,6 +42,7 @@ function geolocationErrorMessage(code: number) {
 export default function DashboardPage() {
   const router = useRouter();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wakeLockRef = useRef<any>(null);
 
   const [user, setUser] = useState<Employee | null>(null);
   const [bootError, setBootError] = useState(false);
@@ -54,6 +55,10 @@ export default function DashboardPage() {
     if (intervalRef.current != null) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
+    }
+    if (wakeLockRef.current) {
+      wakeLockRef.current.release();
+      wakeLockRef.current = null;
     }
   }, []);
 
@@ -183,6 +188,16 @@ export default function DashboardPage() {
 
     setStarting(false);
     setTracking(true);
+    
+    // Request Wake Lock to keep screen on (improves background tracking)
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+      }
+    } catch (e) {
+      console.error("Wake Lock error", e);
+    }
+
     intervalRef.current = setInterval(() => {
       void sendLocationPing({ silentSuccess: true });
     }, PING_INTERVAL_MS);

@@ -115,10 +115,7 @@ export default function AdminMap({ pings, focusedLocation }: Props) {
 
       <style jsx global>{`
         .leaflet-container {
-          background: #0a0a0a !important;
-        }
-        .map-tiles {
-          filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+          background: #ffffff !important;
         }
         .numbered-marker {
           background: none;
