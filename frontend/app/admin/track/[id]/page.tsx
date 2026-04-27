@@ -15,6 +15,7 @@ type Employee = {
   _id: string;
   fullName: string;
   department: string;
+  lastLogin?: string;
 };
 
 type Ping = {
@@ -84,7 +85,13 @@ export default function TrackingPage() {
       <div className="tracking-header">
         <div className="emp-info">
           <h1>{employee?.fullName}</h1>
-          <p>{employee?.department} Sector</p>
+          <div className="emp-meta-row">
+            <span className="badge-sector">{employee?.department} Sector</span>
+            <span className="login-time">
+              <span className="material-symbols-outlined">login</span>
+              Last Login: {employee?.lastLogin ? new Date(employee.lastLogin).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Never'}
+            </span>
+          </div>
         </div>
         <div className="date-picker">
           <label>View Date</label>
@@ -148,6 +155,36 @@ export default function TrackingPage() {
           font-size: 14px;
           text-transform: uppercase;
           letter-spacing: 0.1em;
+        }
+
+        .emp-meta-row {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+          margin-top: 4px;
+        }
+
+        .badge-sector {
+          color: #99907c;
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          background: rgba(153, 144, 124, 0.1);
+          padding: 2px 8px;
+          border-radius: 4px;
+        }
+
+        .login-time {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 12px;
+          color: #ffc0a8;
+          opacity: 0.8;
+        }
+
+        .login-time .material-symbols-outlined {
+          font-size: 16px;
         }
 
         .date-picker {

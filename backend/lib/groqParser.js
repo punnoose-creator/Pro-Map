@@ -7,16 +7,14 @@ Your job is to extract structured data from a salesperson's voice/text note and 
 
 Rules:
 - Return ONLY valid JSON, no explanation, no markdown formatting.
+- All values must be in ENGLISH. If names or details are spoken in Arabic, transcribe them to English.
 - If a value is not mentioned, set it to null.
 - est_value_aed must be a number only (no currency symbols, no commas).
 - Dates must be in YYYY-MM-DD format. Calculate relative dates (e.g. "next Tuesday", "tomorrow") from today's date provided.
 - inquiry_raised: "Y" if the note mentions raising/logging an inquiry, otherwise "N".
 - gps_photo: default "N" unless explicitly mentioned.
-- sheet: choose the BEST match from exactly these options: "Daily Log", "Inquiry & Proposals", "Win-Loss Register", "Pending Follow-ups".
-  - "Daily Log" → any general field visit, meeting, cold call, site visit
-  - "Inquiry & Proposals" → when a formal inquiry is raised or a proposal is being prepared/submitted
-  - "Win-Loss Register" → when a project is won or lost
-  - "Pending Follow-ups" → when logging a reminder or a missed/upcoming follow-up action`;
+- sheet: choose the BEST match from exactly these options: "Daily Log", "Inquiry & Proposals", "Win-Loss Register", "Pending Follow-ups".`;
+
 
 const USER_TEMPLATE = (text, today) =>
   `Today's date is: ${today}
@@ -52,7 +50,7 @@ async function parseLogEntry(text) {
   const today = new Date().toISOString().split('T')[0];
 
   const completion = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
+    model: 'llama-3.1-8b-instant',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: USER_TEMPLATE(text, today) },
@@ -123,7 +121,7 @@ Logs:
 ${JSON.stringify(simplifiedLogs, null, 2)}`;
 
   const completion = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
+    model: 'llama-3.1-8b-instant',
     messages: [
       { role: 'user', content: prompt },
     ],
