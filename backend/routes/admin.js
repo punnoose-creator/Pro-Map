@@ -32,8 +32,19 @@ router.get('/stats', async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const activeEmployees = await LocationPing.distinct('employee', {
-      createdAt: { $gte: today }
+    // Auto-close any orphaned shifts from previous days
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(23, 59, 59, 999);
+    await Shift.updateMany(
+      { date: { $lt: todayStr }, endTime: { $exists: false } },
+      { $set: { endTime: yesterday } }
+    );
+
+    // Only count shifts started today with no endTime as truly active
+    const activeEmployees = await Shift.distinct('employee', {
+      date: todayStr,
+      endTime: { $exists: false }
     });
 
     const totalPingsToday = await LocationPing.countDocuments({

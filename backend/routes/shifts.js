@@ -25,8 +25,8 @@ router.post('/start', protect, async (req, res) => {
         activeShift.endTime = autoEndTime;
         await activeShift.save();
       } else {
-        // Still the same day, don't allow multiple active shifts
-        return res.status(400).json({ success: false, message: 'You already have an active shift for today.' });
+        // Same day — return the existing active shift (e.g. employee re-opened the app)
+        return res.json({ success: true, shift: activeShift, resumed: true });
       }
     }
 
