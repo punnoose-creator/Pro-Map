@@ -1,11 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { Alert, NativeModules, Platform } from 'react-native';
 import { Audio } from 'expo-av';
 
+/**
+ * @react-native-voice/voice always loads JS, but calls NativeModules.Voice at runtime.
+ * In Expo Go (and any build without the native module), Voice is null →
+ * "Cannot read property 'startSpeech' of null". Only enable when native is linked.
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let VoiceMod: any = null;
 try {
-  VoiceMod = require('@react-native-voice/voice').default;
+  const pkg = require('@react-native-voice/voice').default;
+  const native = (NativeModules as { Voice?: unknown }).Voice;
+  if (pkg && Platform.OS !== 'web' && native != null) {
+    VoiceMod = pkg;
+  }
 } catch {
   VoiceMod = null;
 }
@@ -110,7 +119,9 @@ export function useVoiceInput(onAppendText: (chunk: string) => void) {
     if (!V) {
       Alert.alert(
         'Voice input unavailable',
-        'Speech-to-text needs a dev build with the voice module. Please type your update.',
+        Platform.OS === 'web'
+          ? 'Speech-to-text is not supported in the browser. Please type your update.'
+          : 'This build does not include the native speech module (common in Expo Go). Install a development build: npx expo run:android or eas build, then try again—or type your update.',
         [{ text: 'OK' }]
       );
       return;

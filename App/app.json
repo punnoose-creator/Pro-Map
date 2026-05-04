@@ -59,7 +59,25 @@
           "microphonePermission": "Allow Pro Map to access the microphone for voice-to-text work updates.",
           "speechRecognitionPermission": "Allow Pro Map to use speech recognition to transcribe your work updates."
         }
-      ]
-    ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "gradleProperties": {
+              "android.useAndroidX": "true",
+              "android.enableJetifier": "true"
+            }
+          }
+        }
+      ],
+      "./plugins/withExcludeLegacySupportLib.js"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a70883f0-1486-413c-9a62-ac93a6d31d07"
+      }
+    },
+    "owner": "vaikunth441"
   }
 }
