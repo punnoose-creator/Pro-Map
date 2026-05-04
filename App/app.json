@@ -67,6 +67,16 @@
             "gradleProperties": {
               "android.useAndroidX": "true",
               "android.enableJetifier": "true"
+            },
+            "packagingOptions": {
+              "pickFirst": [
+                "META-INF/androidx.appcompat_appcompat.version",
+                "META-INF/androidx.core_core.version",
+                "META-INF/androidx.versionedparcelable_versionedparcelable.version",
+                "META-INF/androidx.loader_loader.version",
+                "META-INF/androidx.vectordrawable_vectordrawable.version",
+                "META-INF/androidx.vectordrawable_animated-vector-drawable.version"
+              ]
             }
           }
         }
