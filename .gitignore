@@ -14,6 +14,8 @@ build/
 # Backend env
 backend/.env
 frontend/.env
+App/.env
+App/.env.*
 .env.local
 .env.development.local
 .env.test.local

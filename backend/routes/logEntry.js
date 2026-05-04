@@ -9,7 +9,7 @@ const LogEntry = require('../models/LogEntry');
  * ...
  */
 router.post('/', protect, async (req, res) => {
-  const { text } = req.body;
+  const { text, latitude, longitude, timestamp } = req.body;
 
   if (!text || typeof text !== 'string' || text.trim().length < 3) {
     return res.status(400).json({
@@ -25,6 +25,12 @@ router.post('/', protect, async (req, res) => {
     // Step 2 — Map to DB Model
     const category = parsed.sheet || 'Daily Log';
     
+    const hasCoords =
+      latitude != null &&
+      longitude != null &&
+      !Number.isNaN(Number(latitude)) &&
+      !Number.isNaN(Number(longitude));
+
     const logEntryData = {
       employee: req.user._id,
       category: category,
@@ -53,6 +59,20 @@ router.post('/', protect, async (req, res) => {
       winReason: parsed.win_reason,
       competitor: parsed.competitor,
       rawText: text.trim(),
+      ...(hasCoords
+        ? {
+            metadata: {
+              clientCapture: {
+                latitude: Number(latitude),
+                longitude: Number(longitude),
+                submittedAt:
+                  typeof timestamp === 'string' && timestamp.trim()
+                    ? timestamp.trim()
+                    : new Date().toISOString(),
+              },
+            },
+          }
+        : {}),
     };
 
     // Step 3 — Save to MongoDB

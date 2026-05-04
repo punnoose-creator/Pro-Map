@@ -1,0 +1,211 @@
+Design a modern Android mobile app admin dashboard for an employee tracking system called "Pro Map".
+
+Theme:
+- Premium dark UI (deep black background)
+- Orange and gold gradient accents
+- Subtle map/grid pattern in background
+- Futuristic, clean, enterprise-grade design
+
+Top Section:
+- Hamburger menu icon (top left)
+- Notification bell icon (top right with small alert dot)
+- Greeting text:
+   "Welcome, Admin 👋"
+- Subtitle:
+   "Here’s what’s happening today"
+
+---
+
+Analytics Cards (4 cards in grid):
+
+1. Total Employees
+   - Icon: Users
+   - Value: e.g. 24
+   - Subtext: "All time"
+
+2. Active Now
+   - Icon: Green dot indicator
+   - Value: e.g. 12
+   - Subtext: "Currently working"
+
+3. Locations Tracked
+   - Icon: Location pin
+   - Value: e.g. 132
+   - Subtext: "Today"
+
+4. Work Updates
+   - Icon: Document/list
+   - Value: e.g. 27
+   - Subtext: "Today"
+
+Cards:
+- Rounded corners
+- Soft glow borders (orange/gold)
+- Subtle shadow
+
+---
+
+Search & Filter Section:
+- Search bar:
+   Placeholder: "Search employee by name or email..."
+- Filter button:
+   Options:
+     - Active / Inactive
+     - Date range
+     - Location
+
+---
+
+Employee List Section:
+
+Title:
+- "Employees"
+- "View All" option (right)
+
+List Item (card style):
+- Avatar (initials in circle)
+- Employee name
+- Email
+- Status badge:
+   - Green: Active
+   - Yellow/Gray: Inactive
+- Last location:
+   - Area name (e.g. Connaught Place)
+   - City
+- Last update time:
+   - e.g. "2 min ago"
+- Arrow icon (clickable)
+
+---
+
+Bottom Section:
+- Card:
+   "Get Smart Summaries"
+   - Description:
+     "Generate weekly or monthly reports for any employee"
+   - CTA Button:
+     "Go to Reports"
+
+---
+
+Bottom Navigation:
+- Dashboard (active)
+- Map View
+- Reports
+- Settings
+
+---
+
+Functionality & Behavior:
+
+1. Data Fetching:
+   - On screen load:
+       → Call backend APIs
+       → Fetch:
+           - Total employees
+           - Active employees count
+           - Location logs count (today)
+           - Work logs count (today)
+           - Employee list
+
+2. Employee List Interaction:
+   - On click:
+       → Navigate to Employee Detail Screen
+       → Pass employee_id
+
+3. Search:
+   - Real-time filtering by:
+       - Name
+       - Email
+
+4. Filter:
+   - Filter employees by:
+       - Active / Inactive
+       - Date (last activity)
+   - Update list dynamically
+
+5. Status Logic:
+   - Active:
+       → If user has active work session
+   - Inactive:
+       → No active tracking
+
+6. Last Location:
+   - Fetch latest location from DB
+   - Show readable area + city
+
+7. Last Update:
+   - Fetch latest work log timestamp
+
+8. Analytics Cards:
+   - Auto-refresh (optional every X seconds)
+   - Or refresh on pull-down
+
+---
+
+Backend (MongoDB Logic):
+
+Collections used:
+- users
+- location_logs
+- work_logs
+
+Example Queries:
+
+1. Total Employees:
+   db.users.countDocuments({ role: "employee" })
+
+2. Active Employees:
+   db.users.countDocuments({ isWorking: true })
+
+3. Locations Tracked Today:
+   db.location_logs.countDocuments({
+      timestamp: { $gte: startOfDay }
+   })
+
+4. Work Updates Today:
+   db.work_logs.countDocuments({
+      timestamp: { $gte: startOfDay }
+   })
+
+5. Employee List:
+   db.users.find({ role: "employee" })
+
+6. Last Location:
+   db.location_logs.find({ user_id })
+      .sort({ timestamp: -1 })
+      .limit(1)
+
+7. Last Work Update:
+   db.work_logs.find({ user_id })
+      .sort({ timestamp: -1 })
+      .limit(1)
+
+---
+
+Navigation Logic:
+
+- Dashboard → Current screen
+- Map View:
+   → Show all employees on map
+- Reports:
+   → Weekly/Monthly summaries
+- Settings:
+   → Admin controls
+
+---
+
+Error Handling:
+
+- API failure → show retry UI
+- No employees → show empty state
+- No location data → show “No data available”
+
+---
+
+UX Enhancements:
+
+- Pull to refresh
+- Skeleton loaders while fetching
+- Smooth card animations
+- Highlight active employees

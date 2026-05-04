@@ -1,0 +1,66 @@
+Design a modern Android mobile app login screen for an employee tracking app called "Pro Map".
+
+Theme:
+- Premium dark UI (black background)
+- Orange and gold gradient accents
+- Subtle map/grid pattern in background
+- Clean, futuristic, enterprise feel
+
+Top Section:
+- Large glowing location pin icon (orange/gold gradient)
+- App name: "PRO MAP" in bold uppercase with gradient
+- Tagline: "Track • Work • Report"
+
+Middle Section:
+- Title: "Welcome Back!"
+- Subtitle: "Login to continue to your account"
+
+Input Fields:
+1. Email / Username field
+2. Password field with visibility toggle icon
+
+Options:
+- "Remember Me" checkbox
+- "Forgot Password?" link (right aligned)
+
+CTA Buttons:
+- Primary: "LOGIN" (large, rounded, orange → gold gradient, glow)
+- Secondary: "Login as Admin" (outlined gold button)
+
+Footer:
+- App version text (small, subtle)
+
+---
+
+Functionality & Behavior:
+
+1. User Input:
+   - Accept email/username and password
+   - Validate input (non-empty, valid format)
+
+2. On LOGIN Click:
+   - Show loading state on button
+   - Send request to backend (MongoDB-based API)
+   - Verify credentials
+   - If success:
+       → Store JWT token
+       → Redirect:
+           - Employee → Home Screen
+           - Admin → Admin Dashboard
+   - If failure:
+       → Show error message ("Invalid credentials")
+
+3. Admin Login:
+   - "Login as Admin" redirects to admin authentication flow
+
+4. Session Handling:
+   - If "Remember Me" enabled → persist login session
+
+5. Security:
+   - Password masked
+   - API over HTTPS
+   - Token-based authentication
+
+6. Edge Cases:
+   - Network failure → show retry message
+   - Invalid input → inline validation errors

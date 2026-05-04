@@ -15,8 +15,125 @@ router.use(protect, restrictTo('admin', 'manager'));
  */
 router.get('/employees', async (req, res) => {
   try {
-    const employees = await Employee.find({ isActive: true }).select('-password');
+    const employees = await Employee.find({ role: 'employee' }).select('-password');
     res.json({ success: true, employees });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/dashboard
+ * Stats + employee list with last ping, last log, active shift (for admin home UI).
+ */
+router.get('/dashboard', async (req, res) => {
+  try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(23, 59, 59, 999);
+    await Shift.updateMany(
+      { date: { $lt: todayStr }, endTime: { $exists: false } },
+      { $set: { endTime: yesterday } }
+    );
+
+    const totalEmployees = await Employee.countDocuments({ role: 'employee' });
+
+    const activeEmployeeIds = await Shift.distinct('employee', {
+      date: todayStr,
+      endTime: { $exists: false },
+    });
+    const activeNow = activeEmployeeIds.length;
+
+    const locationsTrackedToday = await LocationPing.countDocuments({
+      createdAt: { $gte: today },
+    });
+
+    const workUpdatesToday = await LogEntry.countDocuments({
+      date: todayStr,
+      category: { $ne: 'Daily Summary' },
+    });
+
+    const employees = await Employee.find({ role: 'employee' }).select('-password').lean();
+    const ids = employees.map((e) => e._id);
+
+    const pingAgg =
+      ids.length === 0
+        ? []
+        : await LocationPing.aggregate([
+            { $match: { employee: { $in: ids } } },
+            { $sort: { createdAt: -1 } },
+            {
+              $group: {
+                _id: '$employee',
+                createdAt: { $first: '$createdAt' },
+                latitude: { $first: '$latitude' },
+                longitude: { $first: '$longitude' },
+              },
+            },
+          ]);
+
+    const logAgg =
+      ids.length === 0
+        ? []
+        : await LogEntry.aggregate([
+            { $match: { employee: { $in: ids } } },
+            { $sort: { createdAt: -1 } },
+            {
+              $group: {
+                _id: '$employee',
+                createdAt: { $first: '$createdAt' },
+              },
+            },
+          ]);
+
+    const pingMap = Object.fromEntries(pingAgg.map((p) => [String(p._id), p]));
+    const logMap = Object.fromEntries(logAgg.map((l) => [String(l._id), l]));
+    const activeSet = new Set(activeEmployeeIds.map((id) => String(id)));
+
+    const list = employees.map((e) => {
+      const id = String(e._id);
+      const ping = pingMap[id];
+      const log = logMap[id];
+      const pingTime = ping?.createdAt ? new Date(ping.createdAt).getTime() : 0;
+      const logTime = log?.createdAt ? new Date(log.createdAt).getTime() : 0;
+      const lastActivityAt =
+        pingTime || logTime
+          ? new Date(Math.max(pingTime, logTime)).toISOString()
+          : null;
+      return {
+        _id: e._id,
+        fullName: e.fullName,
+        email: e.email,
+        employeeId: e.employeeId,
+        department: e.department,
+        isActive: e.isActive,
+        isWorking: activeSet.has(id),
+        lastPing: ping
+          ? {
+              at: ping.createdAt,
+              latitude: ping.latitude,
+              longitude: ping.longitude,
+            }
+          : null,
+        lastLogAt: log?.createdAt || null,
+        lastActivityAt,
+      };
+    });
+
+    res.json({
+      success: true,
+      stats: {
+        totalEmployees,
+        activeNow,
+        locationsTrackedToday,
+        workUpdatesToday,
+      },
+      employees: list,
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
@@ -56,9 +173,12 @@ router.get('/stats', async (req, res) => {
       category: { $ne: 'Daily Summary' }
     });
 
+    const totalEmployees = await Employee.countDocuments({ role: 'employee' });
+
     res.json({
       success: true,
       stats: {
+        totalEmployees,
         activeInField: activeEmployees.length,
         totalPings: totalPingsToday,
         totalLogsToday: totalLogsToday,
@@ -107,6 +227,103 @@ router.get('/locations/:employeeId', async (req, res) => {
     const workTime = `${hours}h ${mins}m`;
 
     res.json({ success: true, pings, workTime });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * GET /api/admin/employee/:employeeId/day-snapshot?date=YYYY-MM-DD
+ * Employee profile + location pings + work logs for one calendar day.
+ */
+router.get('/employee/:employeeId/day-snapshot', async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    const dateParam = req.query.date;
+    const queryDate = dateParam ? new Date(dateParam) : new Date();
+    if (Number.isNaN(queryDate.getTime())) {
+      return res.status(400).json({ success: false, message: 'Invalid date' });
+    }
+    queryDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(queryDate);
+    endDate.setHours(23, 59, 59, 999);
+    const dayStr = queryDate.toISOString().split('T')[0];
+
+    const employee = await Employee.findById(employeeId).select('-password').lean();
+    if (!employee || employee.role !== 'employee') {
+      return res.status(404).json({ success: false, message: 'Employee not found' });
+    }
+
+    const pings = await LocationPing.find({
+      employee: employeeId,
+      createdAt: { $gte: queryDate, $lte: endDate },
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const shifts = await Shift.find({
+      employee: employeeId,
+      date: dayStr,
+    }).lean();
+
+    let totalMinutes = 0;
+    const todayStr = new Date().toISOString().split('T')[0];
+    shifts.forEach((shift) => {
+      const start = new Date(shift.startTime);
+      const end = shift.endTime
+        ? new Date(shift.endTime)
+        : dayStr === todayStr
+          ? new Date()
+          : new Date(new Date(shift.startTime).setHours(23, 59, 59, 999));
+      totalMinutes += Math.max(0, Math.round((new Date(end).getTime() - start.getTime()) / 60000));
+    });
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    const workTime = `${hours}h ${mins}m`;
+
+    const logs = await LogEntry.find({
+      employee: employeeId,
+      createdAt: { $gte: queryDate, $lte: endDate },
+      category: { $ne: 'Daily Summary' },
+    })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const activeShift =
+      dayStr === todayStr
+        ? await Shift.findOne({
+            employee: employeeId,
+            date: todayStr,
+            endTime: { $exists: false },
+          }).lean()
+        : null;
+
+    const isWorking = !!(dayStr === todayStr && employee.isActive && activeShift);
+
+    res.json({
+      success: true,
+      date: dayStr,
+      employee: {
+        _id: employee._id,
+        fullName: employee.fullName,
+        email: employee.email,
+        employeeId: employee.employeeId,
+        department: employee.department,
+        isActive: employee.isActive,
+        isWorking,
+      },
+      pings,
+      workTime,
+      logs: logs.map((l) => ({
+        _id: l._id,
+        createdAt: l.createdAt,
+        category: l.category,
+        rawText: l.rawText,
+        purpose: l.purpose,
+        company: l.company,
+        metadata: l.metadata,
+      })),
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

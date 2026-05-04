@@ -1,0 +1,84 @@
+Design a modern Android employee dashboard screen for "Pro Map".
+
+Theme:
+- Black background with subtle grid/map texture
+- Orange/gold glowing accents
+- Card-based layout with soft shadows
+
+Top Section:
+- Greeting: "Hello, [User Name] 👋"
+- Subtitle: "Employee"
+- Notification bell icon (top right)
+
+Status Card:
+- Title: "Work Status"
+- Status text:
+   - "Not Started" OR "Active"
+- Subtext:
+   - "Start your work session to track your location"
+- Glowing location icon
+
+Main Actions (3 Cards):
+
+1. Start Work
+   - Play icon (orange glow)
+   - Title: "Start Work"
+   - Description: "Track location every 5 minutes"
+
+2. Add Work
+   - Clipboard/edit icon
+   - Title: "Add Work"
+   - Description: "Add updates via text or voice"
+
+3. Log Out
+   - Exit icon
+   - Title: "Log Out"
+   - Description: "End session and logout"
+
+Bottom Navigation:
+- Home (active)
+- History
+- Profile
+
+---
+
+Functionality & Behavior:
+
+1. Start Work:
+   - On click:
+       → Request location permissions
+       → Start foreground service
+       → Begin tracking location every 5–10 minutes
+       → Update UI:
+           - Status → "Active"
+           - Button changes to "Stop Work"
+   - Show persistent notification (Android requirement)
+
+2. Stop Work:
+   - Stops tracking service
+   - Ends session
+   - Update status to "Not Started"
+
+3. Add Work:
+   - Navigate to Add Work Screen
+   - Pass user session data
+
+4. Log Out:
+   - If tracking active:
+       → Stop tracking first
+   - Clear session token
+   - Redirect to Login screen
+
+5. Background Behavior:
+   - Continue location tracking via foreground service
+   - Store data locally if offline
+   - Sync when online
+
+6. UI State Changes:
+   - Active session:
+       → Highlight status card
+       → Show timer (e.g. "Working for 2h 10m")
+
+7. Error Handling:
+   - Permission denied → show explanation prompt
+   - GPS off → prompt to enable

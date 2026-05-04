@@ -1,0 +1,167 @@
+Design a modern Android mobile app screen for an admin viewing detailed employee activity in an app called "Pro Map".
+
+Theme:
+- Premium dark UI (black background)
+- Orange and gold glowing accents
+- Subtle map/grid texture
+- Clean, futuristic enterprise design
+
+Top Bar:
+- Back arrow (left)
+- Title: "Employee Details"
+- Notification icon (right)
+
+Employee Info Card:
+- Avatar with initials
+- Name (e.g., Vaikunth Kumar)
+- Email
+- Status badge:
+   - Green: Active
+   - Gray: Inactive
+- Last updated time (e.g., "2 min ago")
+
+Tabs Section:
+- Tabs:
+   - Map (active)
+   - Work Updates
+   - Summary
+   - Reports
+
+---
+
+Map Section:
+- Full-width map view (Google Maps style, dark mode)
+- Route polyline showing movement path
+- Location markers at intervals (every 5 min)
+- Highlighted marker with tooltip:
+   - Time
+   - Location name
+
+Map Controls:
+- Fit Route button
+- Zoom in/out buttons
+- Layer toggle button
+
+Date Filter Bar:
+- Current date display
+- Left/right arrows to change day
+- Filter button (date range, custom filters)
+
+---
+
+Work Updates Timeline:
+
+- Vertical timeline with timestamps:
+   Example:
+   - 10:15 AM → Connaught Place → "Meeting with client"
+   - 09:30 AM → Khan Market → "Client call"
+
+Each item:
+- Location name + city
+- Work description
+- Tag:
+   - "Work Update"
+   - "Work Started"
+
+Clickable:
+- On click:
+   → Highlight corresponding point on map
+   → Center map to that location
+
+---
+
+Summary Section (Below Timeline):
+- Two buttons:
+   1. "Download Weekly Summary"
+   2. "Download Monthly Summary"
+- Small note:
+   "Summaries are AI-generated using work updates and location data"
+
+---
+
+Bottom Navigation:
+- Dashboard
+- Map View
+- Employees (active)
+- Settings
+
+---
+
+Functionality & Behavior:
+
+1. Screen Load:
+   - Fetch:
+       → Employee details
+       → Location logs (selected date)
+       → Work logs (selected date)
+
+2. Map Rendering:
+   - Plot all location points
+   - Draw route using polyline
+   - Cluster markers if too many
+
+3. Timeline Interaction:
+   - Clicking a log:
+       → Highlight marker
+       → Zoom to location on map
+
+4. Date Filter:
+   - Change day:
+       → Reload location + logs for selected date
+
+5. Work Logs Sync:
+   - Each log linked with:
+       → timestamp
+       → latitude/longitude
+
+6. Summary Generation:
+   - On button click:
+       → Call backend LLM service
+       → Generate summary
+       → Return downloadable file (PDF/CSV)
+
+7. Backend (MongoDB Logic):
+
+Collections:
+- users
+- location_logs
+- work_logs
+
+Queries:
+
+1. Fetch Locations:
+   db.location_logs.find({
+      user_id,
+      timestamp: { $gte: startOfDay, $lte: endOfDay }
+   })
+
+2. Fetch Work Logs:
+   db.work_logs.find({
+      user_id,
+      timestamp: { $gte: startOfDay, $lte: endOfDay }
+   })
+
+3. Map Linking:
+   - Match logs with nearest location timestamp
+
+4. Summary API:
+   - Combine:
+       → Work logs
+       → Location data
+   - Send to LLM → generate summary
+
+---
+
+Error Handling:
+- No location data → show empty map state
+- No logs → show "No activity for this day"
+- API failure → retry option
+
+---
+
+UX Enhancements:
+- Smooth map animations
+- Highlight active route
+- Loading skeletons
+- Sticky timeline for long lists
+- Auto-scroll to latest update

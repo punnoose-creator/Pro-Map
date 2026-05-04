@@ -1,0 +1,101 @@
+Design a modern Android screen for adding work updates in "Pro Map".
+
+Theme:
+- Premium dark UI (black)
+- Orange/gold glowing accents
+- Clean spacing, minimal, futuristic
+
+Top Bar:
+- Back arrow (left)
+- Title: "Add Work Update"
+  - "Work Update" highlighted in orange/gold
+- Location icon (right)
+
+Info Section:
+- Card showing:
+   - Current time (auto-filled)
+   - "Current Location Captured"
+   - Green indicator dot
+
+Main Section:
+- Heading: "What did you work on?"
+- Character counter (0/1000)
+
+Input Field:
+- Large rounded text box
+- Placeholder: "Type your update here..."
+- Icons:
+   - Attachment
+   - Microphone
+   - AI assist (optional)
+
+Voice Section:
+- Big circular microphone button
+- Title: "Speak your update"
+- Subtext:
+   - "Tap to start speaking"
+   - "Speech will be converted to text"
+
+Suggestions:
+- Chips:
+   - "Meeting with Anurag regarding AI"
+   - "Client call"
+   - "Site visit"
+- "Clear" option
+
+CTA:
+- Large "SUBMIT UPDATE" button (orange → gold gradient)
+
+Footer:
+- Lock icon
+- Text: "Saved with time & location"
+
+---
+
+Functionality & Behavior:
+
+1. Text Input:
+   - User can type manually
+   - Limit to 1000 characters
+
+2. Voice Input:
+   - On mic click:
+       → Request microphone permission
+       → Start speech-to-text
+       → Insert text into input field
+   - Allow editing after transcription
+
+3. Auto Data Capture:
+   - Capture:
+       - Timestamp
+       - Current location (lat/lng)
+
+4. Submit Action:
+   - Validate:
+       → Text not empty
+   - Send to backend (MongoDB):
+       {
+         user_id,
+         text,
+         latitude,
+         longitude,
+         timestamp
+       }
+   - Show success message
+   - Clear input OR go back
+
+5. Offline Support:
+   - Store locally if no internet
+   - Sync later
+
+6. Suggestions:
+   - Based on previous entries
+   - Tap to auto-fill text box
+
+7. Error Handling:
+   - Mic permission denied → fallback to typing
+   - Location unavailable → retry option
+
+8. UX Enhancements:
+   - Show loading on submit
+   - Show “Saved successfully” toast

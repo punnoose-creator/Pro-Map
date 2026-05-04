@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "Pro Map",
+    "slug": "pro-map",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "promap",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.promap.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#000000"
+      },
+      "package": "com.promap.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyA4vkdkaXlUJiaWVCuTlmgjkFvDi_bxMYM"
+        }
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Pro Map to use your location during active work sessions, including in the background.",
+          "locationAlwaysPermission": "Allow Pro Map to use your location in the background during active work sessions.",
+          "locationWhenInUsePermission": "Allow Pro Map to use your location while you use the app.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "@react-native-voice/voice",
+        {
+          "microphonePermission": "Allow Pro Map to access the microphone for voice-to-text work updates.",
+          "speechRecognitionPermission": "Allow Pro Map to use speech recognition to transcribe your work updates."
+        }
+      ]
+    ]
+  }
+}
