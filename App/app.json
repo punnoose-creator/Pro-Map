@@ -83,11 +83,11 @@
       ],
       "./plugins/withExcludeLegacySupportLib.js"
     ],
+    "owner": "andy_02",
     "extra": {
       "eas": {
-        "projectId": "a70883f0-1486-413c-9a62-ac93a6d31d07"
+        "projectId": "a30a2c6a-3cb1-4d59-88f4-769942ca601e"
       }
-    },
-    "owner": "vaikunth441"
+    }
   }
 }
