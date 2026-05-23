@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Clock, User } from 'lucide-react-native';
 import { Colors } from '../theme/colors';
 import { EmployeeDashboardScreen } from '../screens/employee/EmployeeDashboardScreen';
@@ -28,6 +29,7 @@ function TabIcon({
 }
 
 export function EmployeeTabNavigator() {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -35,8 +37,8 @@ export function EmployeeTabNavigator() {
         tabBarStyle: {
           backgroundColor: '#070707',
           borderTopColor: '#1F1F1F',
-          height: 68,
-          paddingBottom: 10,
+          height: 60 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 10),
           paddingTop: 6,
         },
         tabBarActiveTintColor: Colors.orange,

@@ -1,19 +1,28 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, View, ActivityIndicator, Platform } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { Colors } from '../../theme/colors';
 import { useAdminData } from '../../context/AdminDashboardContext';
-
-const DEFAULT_REGION = {
-  latitude: 28.6139,
-  longitude: 77.209,
-  latitudeDelta: 12,
-  longitudeDelta: 12,
-};
+import LeafletMapView, { type LeafletMapHandle } from '../../components/maps/LeafletMapView';
 
 export function AdminMapScreen() {
   const { employees, loading, error } = useAdminData();
+  const mapRef = useRef<LeafletMapHandle>(null);
+  const tabFocused = useIsFocused();
+
+  // Only render the WebView when this tab is focused (belt-and-suspenders with delay).
+  const [mapReady, setMapReady] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      const t = setTimeout(() => setMapReady(true), 320);
+      return () => {
+        clearTimeout(t);
+        setMapReady(false);
+      };
+    }, [])
+  );
 
   const markers = useMemo(
     () =>
@@ -22,26 +31,29 @@ export function AdminMapScreen() {
         .map((e) => ({
           id: e._id,
           title: e.fullName,
-          coordinate: {
-            latitude: e.lastPing!.latitude,
-            longitude: e.lastPing!.longitude,
-          },
+          latitude: e.lastPing!.latitude,
+          longitude: e.lastPing!.longitude,
+          color: e.isWorking ? 'green' : 'orange',
         })),
     [employees]
   );
 
+  useEffect(() => {
+    if (!tabFocused || !mapReady || markers.length === 0) return;
+    mapRef.current?.setData(markers);
+  }, [tabFocused, mapReady, markers]);
+
   return (
     <View style={styles.root}>
-      <MapView
-        style={styles.map}
-        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-        initialRegion={DEFAULT_REGION}
-        showsUserLocation
-      >
-        {markers.map((m) => (
-          <Marker key={m.id} coordinate={m.coordinate} title={m.title} />
-        ))}
-      </MapView>
+      {tabFocused && mapReady && (
+        <LeafletMapView
+          ref={mapRef}
+          style={styles.map}
+          onReady={() => {
+            if (markers.length > 0) mapRef.current?.setData(markers);
+          }}
+        />
+      )}
       <SafeAreaView style={styles.overlay} edges={['top']}>
         <View style={styles.banner}>
           {loading && markers.length === 0 ? (
@@ -59,7 +71,7 @@ export function AdminMapScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
-  map: { ...StyleSheet.absoluteFillObject },
+  map: { ...StyleSheet.absoluteFillObject, borderRadius: 0 },
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, pointerEvents: 'box-none' },
   banner: {
     margin: 16,

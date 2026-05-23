@@ -14,7 +14,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.promap.app"
+      "bundleIdentifier": "com.promap.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -50,7 +53,8 @@
           "locationAlwaysAndWhenInUsePermission": "Allow Pro Map to use your location during active work sessions, including in the background.",
           "locationAlwaysPermission": "Allow Pro Map to use your location in the background during active work sessions.",
           "locationWhenInUsePermission": "Allow Pro Map to use your location while you use the app.",
-          "isAndroidBackgroundLocationEnabled": true
+          "isAndroidBackgroundLocationEnabled": true,
+          "isIosBackgroundLocationEnabled": true
         }
       ],
       [
@@ -83,11 +87,12 @@
       ],
       "./plugins/withExcludeLegacySupportLib.js"
     ],
-    "owner": "andy_02",
+    "owner": "punnoose",
     "extra": {
       "eas": {
-        "projectId": "a30a2c6a-3cb1-4d59-88f4-769942ca601e"
-      }
+        "projectId": "caaace73-21a8-4fe2-8513-d90b6116e60b"
+      },
+      "debugCrashPanel": true
     }
   }
 }

@@ -3,8 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  InteractionManager,
   Modal,
-  Platform,
   RefreshControl,
   ScrollView,
   Share,
@@ -14,13 +14,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, {
-  Callout,
-  Marker,
-  Polyline,
-  PROVIDER_GOOGLE,
-  type Region,
-} from 'react-native-maps';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
+import LeafletMapView, { type LeafletMapHandle, type MapLayer } from '../../components/maps/LeafletMapView';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -36,6 +31,7 @@ import {
   Filter,
   Download,
 } from 'lucide-react-native';
+
 import { Colors } from '../../theme/colors';
 import { MapGridBackground } from '../../components/login/MapGridBackground';
 import type { AdminEmployeesStackParamList } from '../../navigation/adminTypes';
@@ -48,13 +44,6 @@ import { fetchEmployeeSummaries } from '../../services/employeeDayApi';
 type Props = StackScreenProps<AdminEmployeesStackParamList, 'EmployeeActivity'>;
 
 type MainTab = 'map' | 'work' | 'summary' | 'reports';
-
-const DEFAULT_MAP_REGION: Region = {
-  latitude: 28.6139,
-  longitude: 77.209,
-  latitudeDelta: 8,
-  longitudeDelta: 8,
-};
 
 const toNum = (v: unknown): number => parseFloat(String(v ?? 0));
 
@@ -80,12 +69,15 @@ function closestPingIndex(pings: DayPing[], logTimeMs: number): number {
 
 export function AdminEmployeeActivityScreen({ navigation, route }: Props) {
   const { employeeId, fullName: routeName } = route.params;
+  const isScreenFocused = useIsFocused();
   const [dateStr, setDateStr] = useState(() => new Date().toISOString().split('T')[0]);
   const [mainTab, setMainTab] = useState<MainTab>('map');
-  const [mapType, setMapType] = useState<'standard' | 'satellite' | 'hybrid'>('standard');
+  const [mapLayer, setMapLayer] = useState<MapLayer>('standard');
   const [selectedPingIdx, setSelectedPingIdx] = useState<number | null>(null);
+  // Delay map mount; clear on blur so switching bottom tabs never keeps a WebView alive
+  // alongside AdminMapScreen (two WebViews crashes Android).
+  const [mapMounted, setMapMounted] = useState(false);
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
-  const [calloutLabel, setCalloutLabel] = useState<string>('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [summaries, setSummaries] = useState<{
     daily?: string;
@@ -93,9 +85,11 @@ export function AdminEmployeeActivityScreen({ navigation, route }: Props) {
     monthly?: string;
   } | null>(null);
   const [sumLoading, setSumLoading] = useState(false);
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<LeafletMapHandle>(null);
   const timelineScrollRef = useRef<ScrollView>(null);
-  const regionRef = useRef<Region>(DEFAULT_MAP_REGION);
+  const stopStripRef = useRef<ScrollView>(null);
+  /** Non-zero once map row has laid out — avoids WebView/Leaflet init at 0×0 height (Android crash). */
+  const [mapSlotHeight, setMapSlotHeight] = useState(0);
 
   const { data, loading, refreshing, error, onRefresh, reload } = useEmployeeDaySnapshot(
     employeeId,
@@ -151,82 +145,61 @@ export function AdminEmployeeActivityScreen({ navigation, route }: Props) {
     };
   }, [pings]);
 
-  const mapRegion = useMemo(() => {
-    if (!coords.length) {
-      return {
-        latitude: 28.6139,
-        longitude: 77.209,
-        latitudeDelta: 8,
-        longitudeDelta: 8,
-      };
-    }
-    const last = coords[coords.length - 1];
-    return { ...last, latitudeDelta: 0.06, longitudeDelta: 0.06 };
-  }, [coords]);
-
-  useEffect(() => {
-    regionRef.current = mapRegion;
-  }, [mapRegion]);
-
   useEffect(() => {
     setSummaries(null);
   }, [dateStr, employeeId]);
 
-  const fitRoute = useCallback(() => {
-    if (!coords.length || !mapRef.current) return;
-    mapRef.current.fitToCoordinates(coords, {
-      edgePadding: { top: 80, right: 60, bottom: 80, left: 60 },
-      animated: true,
-    });
-  }, [coords]);
+  // Mount WebView only while this stack screen is focused; tear down on blur.
+  // Delay + runAfterInteractions reduces overlap with other tabs' WebViews.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const task = InteractionManager.runAfterInteractions(() => {
+        if (cancelled) return;
+        timeoutId = setTimeout(() => {
+          if (!cancelled) setMapMounted(true);
+        }, 420);
+      });
+      return () => {
+        cancelled = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        if (task && typeof (task as { cancel?: () => void }).cancel === 'function') {
+          (task as { cancel: () => void }).cancel();
+        }
+        setMapMounted(false);
+      };
+    }, [])
+  );
 
-  const zoomBy = useCallback((factor: number) => {
-    const r = regionRef.current;
-    mapRef.current?.animateToRegion(
-      {
-        latitude: r.latitude,
-        longitude: r.longitude,
-        latitudeDelta: Math.max(0.002, r.latitudeDelta * factor),
-        longitudeDelta: Math.max(0.002, r.longitudeDelta * factor),
-      },
-      280
-    );
+  const fitRoute = useCallback(() => {
+    mapRef.current?.fitAll();
   }, []);
 
   const cycleLayer = useCallback(() => {
-    setMapType((t) =>
-      t === 'standard' ? 'satellite' : t === 'satellite' ? 'hybrid' : 'standard'
-    );
+    setMapLayer((l) => {
+      const next: MapLayer = l === 'standard' ? 'satellite' : l === 'satellite' ? 'hybrid' : 'standard';
+      mapRef.current?.setLayer(next);
+      return next;
+    });
   }, []);
 
   const onLogPress = useCallback(
     (log: DayLog) => {
       setSelectedLogId(log._id);
       const idx = closestPingIndex(pings, new Date(log.createdAt).getTime());
-      if (idx < 0 || !coords[idx] || !mapRef.current) return;
+      if (idx < 0) return;
       setSelectedPingIdx(idx);
-      mapRef.current.animateToRegion(
-        {
-          ...coords[idx],
-          latitudeDelta: 0.012,
-          longitudeDelta: 0.012,
-        },
-        650
-      );
     },
-    [pings, coords]
+    [pings]
   );
 
-  const onMarkerPress = useCallback(
-    async (idx: number) => {
-      setSelectedPingIdx(idx);
-      const p = pings[idx];
-      const label =
-        pingLabels[idx] ??
-        `${toNum(p.latitude).toFixed(3)}°, ${toNum(p.longitude).toFixed(3)}°`;
-      setCalloutLabel(label);
+  const onLeafletMarkerPress = useCallback(
+    (id: string) => {
+      const idx = pings.findIndex((p) => p._id === id);
+      if (idx >= 0) setSelectedPingIdx(idx);
     },
-    [pings, pingLabels]
+    [pings]
   );
 
   useEffect(() => {
@@ -285,6 +258,32 @@ export function AdminEmployeeActivityScreen({ navigation, route }: Props) {
     }
   }, [logs.length, mainTab]);
 
+  useEffect(() => {
+    if (mainTab !== 'map' || !mapMounted || !isScreenFocused || mapSlotHeight < 64) return;
+    const markers = pings.map((p, idx) => {
+      const isFirst = idx === 0;
+      const isLast  = idx === pings.length - 1;
+      const label   = isFirst ? 'S' : isLast ? 'E' : String(idx);
+      const color   = selectedPingIdx === idx
+        ? 'gold'
+        : isFirst
+          ? 'green'
+          : isLast
+            ? 'red'
+            : 'orange';
+      return {
+        id: p._id,
+        latitude:  toNum(p.latitude),
+        longitude: toNum(p.longitude),
+        title: new Date(p.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        sub:   pingLabels[idx],
+        color,
+        label,
+      };
+    });
+    mapRef.current?.setData(markers, coords);
+  }, [mainTab, mapMounted, isScreenFocused, mapSlotHeight, pings, coords, pingLabels, selectedPingIdx]);
+
   if (loading && !data) {
     return (
       <View style={styles.boot}>
@@ -335,196 +334,206 @@ export function AdminEmployeeActivityScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.orange} />
-          }
-        >
-          <View style={styles.card}>
-            <LinearGradient colors={[Colors.orange, Colors.gold]} style={styles.avatar}>
-              <Text style={styles.avatarTxt}>{initials(displayName)}</Text>
-            </LinearGradient>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{displayName}</Text>
-              <Text style={styles.email}>{employee?.email ?? '—'}</Text>
-              <View style={styles.rowMeta}>
-                <View style={[styles.badge, active ? styles.badgeOn : styles.badgeOff]}>
-                  <Text style={[styles.badgeTxt, active && styles.badgeTxtOn]}>
-                    {active ? 'Active' : 'Inactive'}
-                  </Text>
-                </View>
-                <Text style={styles.last}>Updated {formatTimeAgo(lastUp)}</Text>
+        {/* Fixed header — card + tabs never scroll */}
+        <View style={styles.card}>
+          <LinearGradient colors={[Colors.orange, Colors.gold]} style={styles.avatar}>
+            <Text style={styles.avatarTxt}>{initials(displayName)}</Text>
+          </LinearGradient>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name}>{displayName}</Text>
+            <Text style={styles.email}>{employee?.email ?? '—'}</Text>
+            <View style={styles.rowMeta}>
+              <View style={[styles.badge, active ? styles.badgeOn : styles.badgeOff]}>
+                <Text style={[styles.badgeTxt, active && styles.badgeTxtOn]}>
+                  {active ? 'Active' : 'Inactive'}
+                </Text>
               </View>
+              <Text style={styles.last}>Updated {formatTimeAgo(lastUp)}</Text>
             </View>
           </View>
+        </View>
 
-          <View style={styles.tabs}>
-            {(
-              [
-                ['map', 'Map'],
-                ['work', 'Work Updates'],
-                ['summary', 'Summary'],
-                ['reports', 'Reports'],
-              ] as const
-            ).map(([key, label]) => (
-              <TouchableOpacity
-                key={key}
-                style={[styles.tab, mainTab === key && styles.tabOn]}
-                onPress={() => setMainTab(key)}
-              >
-                <Text style={[styles.tabTxt, mainTab === key && styles.tabTxtOn]}>{label}</Text>
+        <View style={styles.tabs}>
+          {(
+            [
+              ['map', 'Map'],
+              ['work', 'Work Updates'],
+              ['summary', 'Summary'],
+              ['reports', 'Reports'],
+            ] as const
+          ).map(([key, label]) => (
+            <TouchableOpacity
+              key={key}
+              style={[styles.tab, mainTab === key && styles.tabOn]}
+              onPress={() => setMainTab(key)}
+            >
+              <Text style={[styles.tabTxt, mainTab === key && styles.tabTxtOn]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Map tab — WebView is NOT inside a ScrollView (prevents Android crash) */}
+        {mainTab === 'map' && (
+          <View style={styles.mapTabContainer}>
+            <View style={styles.dateBar}>
+              <TouchableOpacity onPress={() => setDateStr((d) => addDaysToIsoDate(d, -1))}>
+                <ChevronLeft color={Colors.orange} size={28} />
               </TouchableOpacity>
-            ))}
-          </View>
-
-          {mainTab === 'map' && (
-            <View style={styles.mapBlock}>
-              <View style={styles.dateBar}>
-                <TouchableOpacity onPress={() => setDateStr((d) => addDaysToIsoDate(d, -1))}>
-                  <ChevronLeft color={Colors.orange} size={28} />
-                </TouchableOpacity>
-                <Text style={styles.dateTxt}>{dateStr}</Text>
-                <TouchableOpacity onPress={() => setDateStr((d) => addDaysToIsoDate(d, 1))}>
-                  <ChevronRight color={Colors.orange} size={28} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.filterIco} onPress={() => setFilterOpen(true)}>
-                  <Filter color={Colors.orange} size={22} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.mapWrap}>
-                <MapView
-                  ref={mapRef}
-                  style={styles.map}
-                  provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-                  initialRegion={mapRegion}
-                  mapType={mapType}
-                  userInterfaceStyle="dark"
-                  onRegionChangeComplete={(r) => {
-                    regionRef.current = r;
-                  }}
-                >
-                  {coords.length > 1 && (
-                    <Polyline
-                      coordinates={coords}
-                      strokeColor={Colors.orange}
-                      strokeWidth={4}
-                    />
-                  )}
-                  {coords.map((c, idx) => (
-                    <Marker
-                      key={pings[idx]?._id ?? `${idx}-${c.latitude}`}
-                      coordinate={c}
-                      pinColor={
-                        selectedPingIdx === idx
-                          ? '#FBBF24'
-                          : idx === 0
-                            ? '#22C55E'
-                            : idx === coords.length - 1
-                              ? '#EF4444'
-                              : '#F97316'
-                      }
-                      onPress={() => void onMarkerPress(idx)}
-                    >
-                      <Callout>
-                        <View style={styles.callout}>
-                          <Text style={styles.calloutTime}>
-                            {new Date(pings[idx]?.createdAt).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </Text>
-                          <Text style={styles.calloutLoc}>
-                            {pingLabels[idx] ?? calloutLabel ?? 'Location'}
-                          </Text>
-                        </View>
-                      </Callout>
-                    </Marker>
-                  ))}
-                </MapView>
-                {coords.length === 0 && (
-                  <View style={styles.mapEmpty}>
-                    <MapPin color={Colors.textMuted} size={36} />
-                    <Text style={styles.mapEmptyTxt}>No location data for this day</Text>
-                  </View>
-                )}
-              </View>
-              <View style={styles.mapControls}>
-                <TouchableOpacity style={styles.ctrlBtn} onPress={fitRoute}>
-                  <Text style={styles.ctrlTxt}>Fit route</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconBtn} onPress={() => zoomBy(0.55)}>
-                  <ZoomIn color={Colors.orange} size={22} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconBtn} onPress={() => zoomBy(1.65)}>
-                  <ZoomOut color={Colors.orange} size={22} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconBtn} onPress={cycleLayer}>
-                  <Layers color={Colors.gold} size={22} />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.workTime}>Work time: {data?.workTime ?? '0h 0m'}</Text>
+              <Text style={styles.dateTxt}>{dateStr}</Text>
+              <TouchableOpacity onPress={() => setDateStr((d) => addDaysToIsoDate(d, 1))}>
+                <ChevronRight color={Colors.orange} size={28} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.filterIco} onPress={() => setFilterOpen(true)}>
+                <Filter color={Colors.orange} size={22} />
+              </TouchableOpacity>
             </View>
-          )}
+            <View
+              style={styles.mapSlot}
+              onLayout={(e) => setMapSlotHeight(e.nativeEvent.layout.height)}
+            >
+              {mapMounted && isScreenFocused && mapSlotHeight > 64 ? (
+                <LeafletMapView
+                  ref={mapRef}
+                  style={styles.mapFlex}
+                  onMarkerPress={onLeafletMarkerPress}
+                />
+              ) : mapMounted && isScreenFocused ? (
+                <View style={styles.mapSlotLoading}>
+                  <ActivityIndicator color={Colors.orange} />
+                </View>
+              ) : null}
+            </View>
+            {coords.length === 0 && (
+              <View style={styles.mapEmpty}>
+                <MapPin color={Colors.textMuted} size={36} />
+                <Text style={styles.mapEmptyTxt}>No location data for this day</Text>
+              </View>
+            )}
+            <View style={styles.mapControls}>
+              <TouchableOpacity style={styles.ctrlBtn} onPress={fitRoute}>
+                <Text style={styles.ctrlTxt}>Fit route</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => mapRef.current?.zoomIn()}>
+                <ZoomIn color={Colors.orange} size={22} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => mapRef.current?.zoomOut()}>
+                <ZoomOut color={Colors.orange} size={22} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconBtn} onPress={cycleLayer}>
+                <Layers color={Colors.gold} size={22} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.workTime}>Work time: {data?.workTime ?? '0h 0m'}</Text>
 
-          {mainTab === 'work' && (
+            {/* ── Stop strip ─────────────────────────────────────────── */}
+            {pings.length > 0 && (
+              <ScrollView
+                ref={stopStripRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.stopStrip}
+                contentContainerStyle={styles.stopStripContent}
+              >
+                {pings.map((p, idx) => {
+                  const isFirst = idx === 0;
+                  const isLast  = idx === pings.length - 1;
+                  const label   = isFirst ? 'S' : isLast ? 'E' : String(idx);
+                  const dotColor = selectedPingIdx === idx
+                    ? '#FBBF24'
+                    : isFirst ? '#22C55E'
+                    : isLast  ? '#EF4444'
+                    : '#F97316';
+                  const time = new Date(p.createdAt).toLocaleTimeString([], {
+                    hour: '2-digit', minute: '2-digit',
+                  });
+                  const address = pingLabels[idx] ?? '…';
+                  const selected = selectedPingIdx === idx;
+                  return (
+                    <TouchableOpacity
+                      key={p._id}
+                      style={[styles.stopCard, selected && styles.stopCardSel]}
+                      onPress={() => {
+                        setSelectedPingIdx(idx);
+                        mapRef.current?.fitAll();
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={[styles.stopDot, { backgroundColor: dotColor }]}>
+                        <Text style={styles.stopDotLabel}>{label}</Text>
+                      </View>
+                      <Text style={styles.stopTime}>{time}</Text>
+                      <Text style={styles.stopAddr} numberOfLines={2}>{address}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        )}
+
+        {/* Non-map tabs each get their own ScrollView with pull-to-refresh */}
+        {mainTab === 'work' && (
+          <ScrollView
+            style={styles.tabScroll}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.orange} />
+            }
+          >
             <View style={styles.timelineBlock}>
               <Text style={styles.sectionLabel}>Timeline</Text>
               {logs.length === 0 ? (
                 <Text style={styles.empty}>No activity for this day.</Text>
               ) : (
-                <ScrollView ref={timelineScrollRef} nestedScrollEnabled style={{ maxHeight: 420 }}>
-                  {logs.map((item) => {
-                    const { time, place, text, tag } = timelineItem(item);
-                    const sel = selectedLogId === item._id;
-                    return (
-                      <TouchableOpacity
-                        key={item._id}
-                        style={[styles.tlRow, sel && styles.tlRowSel]}
-                        onPress={() => onLogPress(item)}
-                        activeOpacity={0.85}
-                      >
-                        <View style={styles.tlDotCol}>
-                          <View style={[styles.tlDot, sel && styles.tlDotSel]} />
-                          <View style={styles.tlLine} />
+                logs.map((item) => {
+                  const { time, place, text, tag } = timelineItem(item);
+                  const sel = selectedLogId === item._id;
+                  return (
+                    <TouchableOpacity
+                      key={item._id}
+                      style={[styles.tlRow, sel && styles.tlRowSel]}
+                      onPress={() => onLogPress(item)}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.tlDotCol}>
+                        <View style={[styles.tlDot, sel && styles.tlDotSel]} />
+                        <View style={styles.tlLine} />
+                      </View>
+                      <View style={styles.tlBody}>
+                        <Text style={styles.tlTime}>{time} → {place}</Text>
+                        <Text style={styles.tlText}>{text}</Text>
+                        <View style={styles.tlTag}>
+                          <Text style={styles.tlTagTxt}>{tag}</Text>
                         </View>
-                        <View style={styles.tlBody}>
-                          <Text style={styles.tlTime}>
-                            {time} → {place}
-                          </Text>
-                          <Text style={styles.tlText}>{text}</Text>
-                          <View style={styles.tlTag}>
-                            <Text style={styles.tlTagTxt}>{tag}</Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
               )}
               <View style={styles.downloadRow}>
-                <TouchableOpacity
-                  style={styles.dlBtn}
-                  onPress={() => void shareSummary('weekly')}
-                >
+                <TouchableOpacity style={styles.dlBtn} onPress={() => void shareSummary('weekly')}>
                   <Download size={16} color={Colors.orange} />
                   <Text style={styles.dlTxt}>Download Weekly Summary</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.dlBtn}
-                  onPress={() => void shareSummary('monthly')}
-                >
+                <TouchableOpacity style={styles.dlBtn} onPress={() => void shareSummary('monthly')}>
                   <Download size={16} color={Colors.orange} />
                   <Text style={styles.dlTxt}>Download Monthly Summary</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={styles.note}>
-                Summaries are AI-generated using work updates and location data.
-              </Text>
+              <Text style={styles.note}>Summaries are AI-generated using work updates and location data.</Text>
+              <View style={{ height: 40 }} />
             </View>
-          )}
+          </ScrollView>
+        )}
 
-          {mainTab === 'summary' && (
+        {mainTab === 'summary' && (
+          <ScrollView
+            style={styles.tabScroll}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.orange} />
+            }
+          >
             <View style={styles.summaryBlock}>
               {sumLoading ? (
                 <ActivityIndicator color={Colors.orange} style={{ marginVertical: 24 }} />
@@ -540,21 +549,23 @@ export function AdminEmployeeActivityScreen({ navigation, route }: Props) {
               ) : (
                 <Text style={styles.empty}>Open this tab to load AI summaries.</Text>
               )}
+              <View style={{ height: 40 }} />
             </View>
-          )}
+          </ScrollView>
+        )}
 
-          {mainTab === 'reports' && (
+        {mainTab === 'reports' && (
+          <ScrollView style={styles.tabScroll} showsVerticalScrollIndicator={false}>
             <View style={styles.reportsBlock}>
               <Text style={styles.reportsTitle}>Reports</Text>
               <Text style={styles.reportsBody}>
                 Export packaged PDF/CSV can be added when the API returns files. For now, use
                 Download on the Work Updates tab to share text summaries.
               </Text>
+              <View style={{ height: 40 }} />
             </View>
-          )}
-
-          <View style={{ height: 40 }} />
-        </ScrollView>
+          </ScrollView>
+        )}
       </SafeAreaView>
 
       <Modal visible={filterOpen} transparent animationType="fade">
@@ -640,7 +651,12 @@ const styles = StyleSheet.create({
   tabOn: { borderBottomWidth: 2, borderBottomColor: Colors.orange },
   tabTxt: { fontSize: 11, fontWeight: '700', color: Colors.textMuted, textAlign: 'center' },
   tabTxtOn: { color: Colors.orange },
-  mapBlock: { marginTop: 12, paddingHorizontal: 12 },
+  // Map tab fills remaining vertical space — no ScrollView wrapper (prevents Android crash)
+  mapTabContainer: { flex: 1, paddingHorizontal: 12, paddingBottom: 8 },
+  mapSlot: { flex: 1, minHeight: 200 },
+  mapSlotLoading: { flex: 1, minHeight: 200, alignItems: 'center', justifyContent: 'center' },
+  mapFlex: { flex: 1, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(249,115,22,0.25)', overflow: 'hidden' },
+  tabScroll: { flex: 1 },
   dateBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -650,19 +666,11 @@ const styles = StyleSheet.create({
   },
   dateTxt: { fontSize: 16, fontWeight: '800', color: Colors.text, minWidth: 110, textAlign: 'center' },
   filterIco: { marginLeft: 8, padding: 6 },
-  mapWrap: {
-    height: 280,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(249,115,22,0.25)',
-  },
-  map: { flex: 1 },
   mapEmpty: {
-    ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingVertical: 20,
+    gap: 8,
   },
   mapEmptyTxt: { color: Colors.textMuted, marginTop: 8, fontWeight: '700' },
   mapControls: {
@@ -689,6 +697,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#141414',
   },
   workTime: { marginTop: 10, color: Colors.gold, fontWeight: '800', fontSize: 13 },
+  // ── Stop strip ────────────────────────────────────────────────────────────
+  stopStrip: { marginTop: 10 },
+  stopStripContent: { paddingHorizontal: 2, gap: 8, flexDirection: 'row' },
+  stopCard: {
+    width: 100,
+    padding: 10,
+    borderRadius: 14,
+    backgroundColor: '#111',
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stopCardSel: {
+    borderColor: '#FBBF24',
+    backgroundColor: 'rgba(251,191,36,0.08)',
+  },
+  stopDot: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  stopDotLabel: { fontSize: 10, fontWeight: '900', color: '#0B0B0B' },
+  stopTime: { fontSize: 12, fontWeight: '800', color: Colors.text, textAlign: 'center' },
+  stopAddr: { fontSize: 10, color: Colors.textMuted, textAlign: 'center', lineHeight: 14 },
   timelineBlock: { marginTop: 16, paddingHorizontal: 16 },
   sectionLabel: { fontSize: 16, fontWeight: '900', color: Colors.text, marginBottom: 12 },
   empty: { color: Colors.textMuted, fontStyle: 'italic', marginVertical: 16 },

@@ -330,15 +330,15 @@ router.get('/employee/:employeeId/day-snapshot', async (req, res) => {
 });
 
 /**
- * GET /api/admin/activity/:employeeName
- * Fetch logs from MongoDB for a specific employee
+ * GET /api/admin/activity/:employeeId
+ * Fetch logs from MongoDB for a specific employee (by _id)
  */
-router.get('/activity/:employeeName', async (req, res) => {
+router.get('/activity/:employeeId', async (req, res) => {
   try {
-    const { employeeName } = req.params;
-    
-    // Find employee first
-    const employee = await Employee.findOne({ fullName: employeeName });
+    const { employeeId } = req.params;
+
+    // Find employee by _id (safe, unique — no name-collision risk)
+    const employee = await Employee.findById(employeeId);
     if (!employee) {
       return res.status(404).json({ success: false, message: 'Employee not found' });
     }
@@ -369,6 +369,7 @@ router.get('/activity/:employeeName', async (req, res) => {
 /**
  * GET /api/admin/summaries/:employeeId
  * Fetch Daily, Weekly, and Monthly summaries for an employee based on a reference date.
+ * All three Groq LLM calls run in parallel via Promise.all.
  */
 router.get('/summaries/:employeeId', async (req, res) => {
   try {
@@ -385,7 +386,7 @@ router.get('/summaries/:employeeId', async (req, res) => {
       const start = new Date(refDate);
       start.setDate(start.getDate() - daysBack);
       start.setHours(0, 0, 0, 0);
-      
+
       const end = new Date(refDate);
       end.setHours(23, 59, 59, 999);
 
@@ -396,17 +397,18 @@ router.get('/summaries/:employeeId', async (req, res) => {
       }).sort({ createdAt: 1 });
     };
 
-    // 1. Daily
-    const dailyLogs = await getLogs(0);
-    const daily = await generatePeriodSummary(dailyLogs, employee.fullName, 'Daily');
+    // Fetch all log ranges in parallel, then run all three LLM calls in parallel
+    const [dailyLogs, weeklyLogs, monthlyLogs] = await Promise.all([
+      getLogs(0),
+      getLogs(7),
+      getLogs(30),
+    ]);
 
-    // 2. Weekly
-    const weeklyLogs = await getLogs(7);
-    const weekly = await generatePeriodSummary(weeklyLogs, employee.fullName, 'Weekly');
-
-    // 3. Monthly
-    const monthlyLogs = await getLogs(30);
-    const monthly = await generatePeriodSummary(monthlyLogs, employee.fullName, 'Monthly');
+    const [daily, weekly, monthly] = await Promise.all([
+      generatePeriodSummary(dailyLogs,   employee.fullName, 'Daily'),
+      generatePeriodSummary(weeklyLogs,  employee.fullName, 'Weekly'),
+      generatePeriodSummary(monthlyLogs, employee.fullName, 'Monthly'),
+    ]);
 
     res.json({
       success: true,

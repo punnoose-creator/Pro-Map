@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Alert, Linking } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -63,11 +63,13 @@ export function useWorkLocation(token: string | null) {
 
     const bg = await Location.requestBackgroundPermissionsAsync();
     if (bg.status !== 'granted') {
-      Alert.alert(
-        'Background location',
-        'Please allow “Allow all the time” (or Always) so tracking can continue when the screen is off.',
-        [{ text: 'OK', onPress: () => void Linking.openSettings() }]
-      );
+      const msg =
+        Platform.OS === 'ios'
+          ? 'Please select "Always" in location settings so tracking continues when the screen is off.'
+          : 'Please allow "Allow all the time" so tracking can continue when the screen is off.';
+      Alert.alert('Background location', msg, [
+        { text: 'OK', onPress: () => void Linking.openSettings() },
+      ]);
       return false;
     }
 
@@ -77,11 +79,14 @@ export function useWorkLocation(token: string | null) {
         accuracy: Location.Accuracy.Balanced,
         timeInterval: INTERVAL_MS,
         distanceInterval: 0,
-        foregroundService: {
-          notificationTitle: 'Pro Map',
-          notificationBody: 'Work location tracking is active.',
-          notificationColor: '#F97316',
-        },
+        // foregroundService is Android-only; expo-location ignores it on iOS
+        ...(Platform.OS === 'android' && {
+          foregroundService: {
+            notificationTitle: 'Pro Map',
+            notificationBody: 'Work location tracking is active.',
+            notificationColor: '#F97316',
+          },
+        }),
       });
       await AsyncStorage.setItem(STORAGE.WORK_SESSION_START, new Date().toISOString());
       setIsTracking(true);

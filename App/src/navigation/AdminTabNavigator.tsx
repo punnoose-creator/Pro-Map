@@ -1,6 +1,7 @@
 import React, { type ComponentType } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LayoutGrid, MapPin, Users, Settings } from 'lucide-react-native';
 import { Colors } from '../theme/colors';
 import { AdminDashboardScreen } from '../screens/admin/AdminDashboardScreen';
@@ -31,15 +32,18 @@ function TabIcon({
 }
 
 export function AdminTabNavigator() {
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={{
+        lazy: true,
+        freezeOnBlur: true,
         headerShown: false,
         tabBarStyle: {
           backgroundColor: '#070707',
           borderTopColor: '#1F1F1F',
-          height: 68,
-          paddingBottom: 10,
+          height: 60 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 10),
           paddingTop: 6,
         },
         tabBarActiveTintColor: Colors.orange,

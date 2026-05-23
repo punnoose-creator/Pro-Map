@@ -87,7 +87,7 @@ export function AddWorkScreen({ navigation }: Props) {
     });
   }, []);
 
-  const { isListening, partialText, hint, toggleListening, stopVoice } =
+  const { isListening, partialText, hint, toggleListening, stopVoice, voiceView } =
     useVoiceInput(appendVoice);
 
   useEffect(() => {
@@ -223,6 +223,7 @@ export function AddWorkScreen({ navigation }: Props) {
 
   return (
     <View style={styles.root}>
+      {voiceView}
       <SafeAreaView style={styles.safe} edges={['top']}>
         <KeyboardAvoidingView
           style={styles.flex}

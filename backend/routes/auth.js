@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Employee = require('../models/Employee');
+const { protect } = require('../middleware/auth');
 
 // Helper: Generate JWT
 const generateToken = (id) => {
@@ -144,37 +145,22 @@ router.post('/login', async (req, res) => {
 // @route   GET /api/auth/me
 // @desc    Get current logged-in employee
 // @access  Private
-router.get('/me', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ success: false, message: 'Not authorized' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const employee = await Employee.findById(decoded.id);
-
-    if (!employee) {
-      return res.status(404).json({ success: false, message: 'Employee not found' });
-    }
-
-    res.status(200).json({
-      success: true,
-      employee: {
-        id: employee._id,
-        fullName: employee.fullName,
-        employeeId: employee.employeeId,
-        email: employee.email,
-        department: employee.department,
-        role: employee.role,
-        phone: employee.phone,
-        lastLogin: employee.lastLogin,
-      },
-    });
-  } catch (error) {
-    res.status(401).json({ success: false, message: 'Token invalid or expired' });
-  }
+router.get('/me', protect, (req, res) => {
+  // req.user is already set by the protect middleware
+  const employee = req.user;
+  res.status(200).json({
+    success: true,
+    employee: {
+      id: employee._id,
+      fullName: employee.fullName,
+      employeeId: employee.employeeId,
+      email: employee.email,
+      department: employee.department,
+      role: employee.role,
+      phone: employee.phone,
+      lastLogin: employee.lastLogin,
+    },
+  });
 });
 
 module.exports = router;

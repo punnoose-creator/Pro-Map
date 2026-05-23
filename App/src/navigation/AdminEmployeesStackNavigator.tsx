@@ -8,7 +8,7 @@ const Stack = createStackNavigator<AdminEmployeesStackParamList>();
 
 export function AdminEmployeesStackNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }}>
       <Stack.Screen name="EmployeeList" component={AdminEmployeeDirectoryScreen} />
       <Stack.Screen name="EmployeeActivity" component={AdminEmployeeActivityScreen} />
     </Stack.Navigator>
