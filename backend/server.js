@@ -12,14 +12,31 @@ const shiftRoutes = require('./routes/shifts');
 
 const app = express();
 
+// Allowed web origins. Extra domains can be added via the CORS_ORIGINS env
+// var (comma-separated) without a code change.
+const staticOrigins = [
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+  'http://localhost:5173',   // Vite dev server (Admin Dashboard)
+  'http://127.0.0.1:5173',
+];
+const envOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const allowedOrigins = [...staticOrigins, ...envOrigins];
+
 // Middleware
 app.use(cors({
-  origin: [
-    'http://localhost:3000', 
-    'http://127.0.0.1:3000', 
-    'https://frontend-nu-ochre-27.vercel.app',
-    '*'
-  ],
+  origin(origin, callback) {
+    // Native mobile app / curl / server-to-server send no Origin header — allow them.
+    if (!origin) return callback(null, true);
+    // Allow configured origins plus any *.vercel.app deployment (prod + previews).
+    if (allowedOrigins.includes(origin) || /\.vercel\.app$/.test(new URL(origin).hostname)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
