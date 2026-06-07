@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LOCATION_TASK_NAME } from '../tasks/locationTask';
 import { STORAGE } from '../constants/storageKeys';
 import { stopBackgroundTracking } from '../services/locationLifecycle';
+import { startShift, stopShift } from '../services/shiftApi';
 
 const INTERVAL_MS = 5 * 60 * 1000;
 
@@ -89,6 +90,13 @@ export function useWorkLocation(token: string | null) {
         }),
       });
       await AsyncStorage.setItem(STORAGE.WORK_SESSION_START, new Date().toISOString());
+      // Open a work shift so the admin dashboard reflects "active now" + work hours.
+      // Tracking has already started, so don't fail the whole start on a shift error.
+      try {
+        await startShift(token);
+      } catch (shiftErr) {
+        console.warn('startShift failed', shiftErr);
+      }
       setIsTracking(true);
       return true;
     } catch (e) {
@@ -103,9 +111,15 @@ export function useWorkLocation(token: string | null) {
   const stop = useCallback(async () => {
     await stopBackgroundTracking();
     await AsyncStorage.removeItem(STORAGE.WORK_SESSION_START);
+    // Close the open shift; don't block the local stop if the call fails.
+    try {
+      await stopShift(token);
+    } catch (shiftErr) {
+      console.warn('stopShift failed', shiftErr);
+    }
     setIsTracking(false);
     return true;
-  }, []);
+  }, [token]);
 
   return { isTracking, start, stop, errorMsg };
 }
