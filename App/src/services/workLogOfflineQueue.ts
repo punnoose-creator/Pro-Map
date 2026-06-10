@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_BASE } from '../config/constants';
 import { STORAGE } from '../constants/storageKeys';
-import type { WorkLogPayload } from './workLogApi';
+import { buildFormData, type WorkLogPayload } from './workLogApi';
 
 async function readQueue(): Promise<WorkLogPayload[]> {
   const raw = await AsyncStorage.getItem(STORAGE.OFFLINE_WORK_QUEUE);
@@ -39,7 +39,10 @@ export async function flushOfflineWorkQueue(): Promise<{ sent: number; pending: 
   while (remaining.length) {
     const item = remaining[0];
     try {
-      await axios.post(`${API_BASE}/log-entry`, item, { timeout: 25000 });
+      await axios.post(`${API_BASE}/log-entry`, buildFormData(item), {
+        timeout: 45000,
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       remaining.shift();
       sent++;
     } catch {

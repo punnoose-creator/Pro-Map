@@ -42,7 +42,8 @@
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
       ]
     },
     "plugins": [
@@ -62,6 +63,12 @@
         {
           "microphonePermission": "Allow Pro Map to access the microphone for voice-to-text work updates.",
           "speechRecognitionPermission": "Allow Pro Map to use speech recognition to transcribe your work updates."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Allow Pro Map to take a geo-tagged photo as proof of your field work."
         }
       ],
       [
@@ -87,12 +94,12 @@
       ],
       "./plugins/withExcludeLegacySupportLib.js"
     ],
-    "owner": "punnoose",
+    "owner": "anuragnagare",
     "extra": {
+      "debugCrashPanel": true,
       "eas": {
-        "projectId": "caaace73-21a8-4fe2-8513-d90b6116e60b"
-      },
-      "debugCrashPanel": true
+        "projectId": "e4807f11-d491-49f7-94c7-283464428340"
+      }
     }
   }
 }

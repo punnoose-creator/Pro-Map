@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 
 /** Base URL for MongoDB-backed API (HTTPS). Override with EXPO_PUBLIC_API_URL. */
 export const API_BASE =
-  process.env.EXPO_PUBLIC_API_URL ?? 'https://pro-map-pied.vercel.app/api';
+  process.env.EXPO_PUBLIC_API_URL ?? 'https://backend-ncuu.vercel.app/api';
 
 export const APP_VERSION =
   Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? '1.0.0';
