@@ -2,9 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   KeyboardAvoidingView,
-  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -18,8 +16,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
 import type { StackScreenProps } from '@react-navigation/stack';
 import axios from 'axios';
 import {
@@ -33,15 +29,12 @@ import {
   Send,
   Plus,
   History,
-  Camera,
-  X,
 } from 'lucide-react-native';
 import type { EmployeeStackParamList } from '../../navigation/employeeTypes';
 import { Colors } from '../../theme/colors';
 import { useLocationSnapshot } from '../../hooks/useLocationSnapshot';
 import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { postWorkLog } from '../../services/workLogApi';
-import { GeoPhotoModal, type GeoStamp } from '../../components/work/GeoPhotoModal';
 import { enqueueOfflineWork, flushOfflineWorkQueue } from '../../services/workLogOfflineQueue';
 import {
   loadSuggestionChips,
@@ -86,15 +79,6 @@ export function AddWorkScreen({ navigation }: Props) {
   const [chips, setChips] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [rawPhotoUri, setRawPhotoUri] = useState<string | null>(null);
-  const [stampedPhotoUri, setStampedPhotoUri] = useState<string | null>(null);
-  const [stamp, setStamp] = useState<GeoStamp | null>(null);
-  const [photoModalVisible, setPhotoModalVisible] = useState(false);
-  const [capturing, setCapturing] = useState(false);
-  /** Coords locked in at photo capture time — used for the stamp and the payload. */
-  const [photoCoords, setPhotoCoords] = useState<{ latitude: number; longitude: number } | null>(
-    null
-  );
 
   const appendVoice = useCallback((chunk: string) => {
     setText((prev) => {
@@ -130,112 +114,7 @@ export function AddWorkScreen({ navigation }: Props) {
 
   const charsLeft = MAX_CHARS - text.length;
   const canSubmit =
-    text.trim().length > 0 &&
-    text.trim().length <= MAX_CHARS &&
-    !!stampedPhotoUri &&
-    !submitting &&
-    !isListening;
-
-  const takePhoto = useCallback(async () => {
-    setCapturing(true);
-    try {
-      const camPerm = await ImagePicker.requestCameraPermissionsAsync();
-      if (!camPerm.granted) {
-        Alert.alert(
-          'Camera permission needed',
-          'Pro Map needs the camera to capture a geo-tagged photo of your field work.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'App settings', onPress: () => void Linking.openSettings() },
-          ]
-        );
-        return;
-      }
-
-      // Lock in a fresh GPS fix for the stamp + payload.
-      let lat = coords?.latitude;
-      let lng = coords?.longitude;
-      try {
-        const services = await Location.hasServicesEnabledAsync();
-        const locPerm = await Location.requestForegroundPermissionsAsync();
-        if (services && locPerm.status === 'granted') {
-          const pos = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          lat = pos.coords.latitude;
-          lng = pos.coords.longitude;
-        }
-      } catch {
-        /* fall back to snapshot coords below */
-      }
-      if (lat == null || lng == null) {
-        Alert.alert('Location needed', 'Capture your location first so the photo can be geo-tagged.', [
-          { text: 'OK', onPress: () => void refreshLocation() },
-        ]);
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        cameraType: ImagePicker.CameraType.back,
-        quality: 0.6,
-        allowsEditing: false,
-      });
-      if (result.canceled) return;
-      const asset = result.assets?.[0];
-      if (!asset?.uri) return;
-
-      // Build the geo-stamp (best-effort reverse geocode).
-      let place = `${lat.toFixed(4)}°, ${lng.toFixed(4)}°`;
-      let address: string | undefined;
-      try {
-        const geo = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
-        const g = geo[0];
-        if (g) {
-          place =
-            [g.district ?? g.subregion ?? g.name, g.city ?? g.region].filter(Boolean).join(', ') ||
-            place;
-          address =
-            [g.name, g.street, g.city, g.region, g.postalCode, g.country]
-              .filter(Boolean)
-              .join(', ') || undefined;
-        }
-      } catch {
-        /* keep coord-only place */
-      }
-
-      const dateTime = new Date().toLocaleString(undefined, {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      });
-
-      setPhotoCoords({ latitude: lat, longitude: lng });
-      setStamp({ place, address, latitude: lat, longitude: lng, dateTime });
-      setRawPhotoUri(asset.uri);
-      setPhotoModalVisible(true);
-    } catch {
-      Alert.alert('Camera', 'Could not capture a photo. Please try again.');
-    } finally {
-      setCapturing(false);
-    }
-  }, [coords, refreshLocation]);
-
-  const onUsePhoto = useCallback((uri: string) => {
-    setStampedPhotoUri(uri);
-    setRawPhotoUri(null);
-    setPhotoModalVisible(false);
-  }, []);
-
-  const onRetakePhoto = useCallback(() => {
-    setPhotoModalVisible(false);
-    setStampedPhotoUri(null);
-    void takePhoto();
-  }, [takePhoto]);
-
-  const onRemovePhoto = useCallback(() => {
-    setStampedPhotoUri(null);
-    setStamp(null);
-    setPhotoCoords(null);
-  }, []);
+    text.trim().length > 0 && text.trim().length <= MAX_CHARS && !submitting && !isListening;
 
   const applyChip = useCallback((c: string) => {
     setText((prev) => (prev ? `${prev.trim()}\n${c}` : c).slice(0, MAX_CHARS));
@@ -281,13 +160,7 @@ export function AddWorkScreen({ navigation }: Props) {
       );
       return;
     }
-    if (!stampedPhotoUri) {
-      Alert.alert('Photo required', 'Take a geo-tagged work photo before submitting.');
-      return;
-    }
-    const lat = photoCoords?.latitude ?? coords?.latitude;
-    const lng = photoCoords?.longitude ?? coords?.longitude;
-    if (lat == null || lng == null) {
+    if (!coords) {
       Alert.alert('Location', locError ?? 'Location not captured yet.', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Retry', onPress: () => void refreshLocation() },
@@ -300,19 +173,15 @@ export function AddWorkScreen({ navigation }: Props) {
     const timestamp = new Date().toISOString();
     const payload = {
       text: trimmed,
-      latitude: lat,
-      longitude: lng,
+      latitude: coords.latitude,
+      longitude: coords.longitude,
       timestamp,
-      photoUri: stampedPhotoUri,
     };
 
     try {
       const data = await postWorkLog(payload);
       if (data?.success) {
         await rememberSuggestion(trimmed);
-        setStampedPhotoUri(null);
-        setStamp(null);
-        setPhotoCoords(null);
         setToast('Saved successfully');
         void flushOfflineWorkQueue();
         setTimeout(() => navigation.goBack(), 1200);
@@ -335,7 +204,7 @@ export function AddWorkScreen({ navigation }: Props) {
     } finally {
       setSubmitting(false);
     }
-  }, [text, coords, locError, refreshLocation, stopVoice, navigation, stampedPhotoUri, photoCoords]);
+  }, [text, coords, locError, refreshLocation, stopVoice, navigation]);
 
   const locationOk = !!coords && !locError;
 
@@ -455,48 +324,6 @@ export function AddWorkScreen({ navigation }: Props) {
             ) : null}
             {hint ? <Text style={styles.hint}>{hint}</Text> : null}
 
-            <View style={styles.photoHeaderRow}>
-              <Text style={styles.heading}>
-                Work <Text style={styles.headingAccent}>photo</Text>
-              </Text>
-              <Text style={styles.requiredTag}>Required</Text>
-            </View>
-            {stampedPhotoUri ? (
-              <View style={styles.photoPreview}>
-                <Image source={{ uri: stampedPhotoUri }} style={styles.photoThumb} />
-                <View style={styles.photoActions}>
-                  <Text style={styles.photoOk}>✓ Geo-tagged photo attached</Text>
-                  <View style={styles.photoBtnRow}>
-                    <TouchableOpacity style={styles.photoSmallBtn} onPress={() => void takePhoto()}>
-                      <Camera size={16} color={Colors.orange} />
-                      <Text style={styles.photoSmallTxt}>Retake</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.photoSmallBtn} onPress={onRemovePhoto}>
-                      <X size={16} color={Colors.error} />
-                      <Text style={[styles.photoSmallTxt, { color: Colors.error }]}>Remove</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.photoCta}
-                onPress={() => void takePhoto()}
-                disabled={capturing}
-                activeOpacity={0.85}
-              >
-                {capturing ? (
-                  <ActivityIndicator color={Colors.orange} />
-                ) : (
-                  <>
-                    <Camera size={26} color={Colors.orange} />
-                    <Text style={styles.photoCtaTxt}>Take work photo</Text>
-                    <Text style={styles.photoCtaSub}>Live camera · location stamped on the image</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
-
             <View style={styles.voiceCard}>
               <TouchableOpacity
                 style={[styles.micOuter, isListening && styles.micOuterOn]}
@@ -578,15 +405,6 @@ export function AddWorkScreen({ navigation }: Props) {
           <Text style={styles.toastText}>{toast}</Text>
         </View>
       ) : null}
-
-      <GeoPhotoModal
-        visible={photoModalVisible}
-        photoUri={rawPhotoUri}
-        stamp={stamp}
-        onUse={onUsePhoto}
-        onRetake={onRetakePhoto}
-        onCancel={() => setPhotoModalVisible(false)}
-      />
     </View>
   );
 }
@@ -716,62 +534,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   hint: { marginTop: 6, fontSize: 12, color: Colors.textMuted },
-  photoHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 22,
-    marginBottom: 10,
-  },
-  requiredTag: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: Colors.orange,
-    backgroundColor: 'rgba(249,115,22,0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    overflow: 'hidden',
-  },
-  photoCta: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 22,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: 'rgba(249,115,22,0.5)',
-    borderStyle: 'dashed',
-    backgroundColor: 'rgba(249,115,22,0.06)',
-    gap: 6,
-  },
-  photoCtaTxt: { color: Colors.text, fontSize: 16, fontWeight: '800', marginTop: 4 },
-  photoCtaSub: { color: Colors.textMuted, fontSize: 12 },
-  photoPreview: {
-    flexDirection: 'row',
-    gap: 14,
-    padding: 12,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(34,197,94,0.4)',
-    backgroundColor: 'rgba(34,197,94,0.06)',
-    alignItems: 'center',
-  },
-  photoThumb: { width: 84, height: 112, borderRadius: 12, backgroundColor: '#111' },
-  photoActions: { flex: 1, gap: 12 },
-  photoOk: { color: '#4ADE80', fontSize: 14, fontWeight: '800' },
-  photoBtnRow: { flexDirection: 'row', gap: 10 },
-  photoSmallBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    backgroundColor: '#101010',
-  },
-  photoSmallTxt: { color: Colors.orange, fontSize: 13, fontWeight: '700' },
   voiceCard: {
     flexDirection: 'row',
     alignItems: 'center',

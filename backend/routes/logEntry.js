@@ -6,7 +6,7 @@ const LogEntry = require('../models/LogEntry');
 
 /**
  * POST /api/log-entry
- * ...
+ * JSON body: { text, latitude, longitude, timestamp }
  */
 router.post('/', protect, async (req, res) => {
   const { text, latitude, longitude, timestamp } = req.body;
@@ -21,10 +21,10 @@ router.post('/', protect, async (req, res) => {
   try {
     // Step 1 — Parse natural language with Groq LLM
     const parsed = await parseLogEntry(text.trim());
-    
+
     // Step 2 — Map to DB Model
     const category = parsed.sheet || 'Daily Log';
-    
+
     const hasCoords =
       latitude != null &&
       longitude != null &&
@@ -47,7 +47,6 @@ router.post('/', protect, async (req, res) => {
       inquiryId: parsed.inquiry_id,
       nextAction: parsed.next_action,
       followUpDate: parsed.follow_up_date,
-      gpsPhoto: parsed.gps_photo,
       // Category specific
       proposalTrack: parsed.proposal_track,
       proposalValueAED: parsed.proposal_value_aed ? parseFloat(parsed.proposal_value_aed) : 0,
@@ -95,4 +94,3 @@ router.post('/', protect, async (req, res) => {
 });
 
 module.exports = router;
-

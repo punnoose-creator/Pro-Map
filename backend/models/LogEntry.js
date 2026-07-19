@@ -58,11 +58,6 @@ const logEntrySchema = new mongoose.Schema(
     followUpDate: {
       type: String,
     },
-    gpsPhoto: {
-      type: String,
-      enum: ['Y', 'N'],
-      default: 'N',
-    },
     productive: {
       type: String,
     },

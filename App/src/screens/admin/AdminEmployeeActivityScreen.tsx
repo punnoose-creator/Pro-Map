@@ -3,9 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  Image,
   InteractionManager,
-  Linking,
   Modal,
   RefreshControl,
   ScrollView,
@@ -504,14 +502,6 @@ export function AdminEmployeeActivityScreen({ navigation, route }: Props) {
                       <View style={styles.tlBody}>
                         <Text style={styles.tlTime}>{time} → {place}</Text>
                         <Text style={styles.tlText}>{text}</Text>
-                        {item.photoUrl ? (
-                          <TouchableOpacity
-                            activeOpacity={0.85}
-                            onPress={() => void Linking.openURL(item.photoUrl!)}
-                          >
-                            <Image source={{ uri: item.photoUrl }} style={styles.tlPhoto} />
-                          </TouchableOpacity>
-                        ) : null}
                         <View style={styles.tlTag}>
                           <Text style={styles.tlTagTxt}>{tag}</Text>
                         </View>
@@ -755,15 +745,6 @@ const styles = StyleSheet.create({
   tlBody: { flex: 1, paddingBottom: 16, paddingLeft: 8 },
   tlTime: { fontSize: 13, fontWeight: '800', color: Colors.orange, marginBottom: 4 },
   tlText: { fontSize: 14, color: Colors.text, lineHeight: 20 },
-  tlPhoto: {
-    width: 120,
-    height: 160,
-    borderRadius: 10,
-    marginTop: 8,
-    backgroundColor: '#111',
-    borderWidth: 1,
-    borderColor: 'rgba(249,115,22,0.3)',
-  },
   tlTag: {
     alignSelf: 'flex-start',
     marginTop: 8,

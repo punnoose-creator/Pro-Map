@@ -12,7 +12,6 @@ Rules:
 - est_value_aed must be a number only (no currency symbols, no commas).
 - Dates must be in YYYY-MM-DD format. Calculate relative dates (e.g. "next Tuesday", "tomorrow") from today's date provided.
 - inquiry_raised: "Y" if the note mentions raising/logging an inquiry, otherwise "N".
-- gps_photo: default "N" unless explicitly mentioned.
 - sheet: choose the BEST match from exactly these options: "Daily Log", "Inquiry & Proposals", "Win-Loss Register", "Pending Follow-ups".`;
 
 
@@ -35,7 +34,6 @@ Extract the following fields from the salesperson's note below:
 - inquiry_id (only if explicitly mentioned, otherwise null)
 - next_action (what needs to happen next)
 - follow_up_date (YYYY-MM-DD)
-- gps_photo ("Y" or "N")
 - productive ("Y" or "N", default "Y")
 
 Salesperson's note:
@@ -74,7 +72,6 @@ async function parseLogEntry(text) {
   parsed.date = parsed.date || today;
   parsed.sheet = parsed.sheet || 'Daily Log';
   parsed.inquiry_raised = parsed.inquiry_raised || 'N';
-  parsed.gps_photo = parsed.gps_photo || 'N';
   parsed.productive = parsed.productive || 'Y';
 
   return parsed;

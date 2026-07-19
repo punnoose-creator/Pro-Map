@@ -1,1 +1,16 @@
+# Dependencies
+node_modules/
+
+# Secrets — never commit
+.env
+.env.*
+service-account-key.json
+*.pem
+
+# Vercel
 .vercel
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

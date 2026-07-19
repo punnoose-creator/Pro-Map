@@ -15,7 +15,6 @@ export type DayLog = {
   rawText?: string;
   purpose?: string;
   company?: string;
-  photoUrl?: string;
   metadata?: { clientCapture?: { latitude?: number; longitude?: number } };
 };
 
@@ -129,7 +128,6 @@ export async function fetchEmployeeDaySnapshot(
           rawText?: string;
           purpose?: string;
           company?: string;
-          photoUrl?: string;
         }>;
         message?: string;
       }>(`${API_BASE}/admin/activity/${employee._id}`, {
@@ -145,7 +143,6 @@ export async function fetchEmployeeDaySnapshot(
           rawText: a.rawText,
           purpose: a.purpose,
           company: a.company,
-          photoUrl: a.photoUrl,
         }));
     } catch {
       logs = [];
