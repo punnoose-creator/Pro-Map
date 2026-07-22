@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import Voice, { type SpeechErrorEvent, type SpeechResultsEvent } from '@react-native-voice/voice';
 import { Audio } from 'expo-av';
+import { pushCrashDebugLine } from '../debug/crashDebugBuffer';
 
 // Native on-device speech recognition (Android SpeechRecognizer / iOS SFSpeechRecognizer).
 // Restart-on-end mimics a continuous session: each utterance ends recognition,
@@ -25,9 +26,16 @@ export function useVoiceInput(onAppendText: (chunk: string) => void) {
   appendRef.current = onAppendText;
 
   useEffect(() => {
+    pushCrashDebugLine('Voice', `Voice module typeof=${typeof Voice}, isAvailable typeof=${typeof Voice?.isAvailable}`);
     Voice.isAvailable()
-      .then((result) => setAvailable(!!result))
-      .catch(() => setAvailable(false));
+      .then((result) => {
+        pushCrashDebugLine('Voice', `isAvailable() resolved: ${JSON.stringify(result)}`);
+        setAvailable(!!result);
+      })
+      .catch((err) => {
+        pushCrashDebugLine('Voice', 'isAvailable() REJECTED (native error)', err?.message ?? String(err));
+        setAvailable(false);
+      });
 
     Voice.onSpeechStart = () => {
       setIsListening(true);
