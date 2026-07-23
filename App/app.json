@@ -3,7 +3,6 @@
     "name": "Pro Map",
     "slug": "pro-map",
     "version": "1.0.0",
-    "newArchEnabled": false,
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -59,10 +58,11 @@
         }
       ],
       [
-        "@react-native-voice/voice",
+        "expo-speech-recognition",
         {
           "microphonePermission": "Allow Pro Map to access the microphone for voice-to-text work updates.",
-          "speechRecognitionPermission": "Allow Pro Map to use speech recognition to transcribe your work updates."
+          "speechRecognitionPermission": "Allow Pro Map to use speech recognition to transcribe your work updates.",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
         }
       ],
       [
@@ -86,8 +86,7 @@
           }
         }
       ],
-      "./plugins/withExcludeLegacySupportLib.js",
-      "./plugins/withSpeechRecognitionQueries.js"
+      "./plugins/withExcludeLegacySupportLib.js"
     ],
     "owner": "anuragnagare",
     "extra": {

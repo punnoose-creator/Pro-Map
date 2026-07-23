@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert } from 'react-native';
-import Voice, { type SpeechErrorEvent, type SpeechResultsEvent } from '@react-native-voice/voice';
-import { Audio } from 'expo-av';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+  type ExpoSpeechRecognitionErrorEvent,
+  type ExpoSpeechRecognitionResultEvent,
+} from 'expo-speech-recognition';
 import { pushCrashDebugLine } from '../debug/crashDebugBuffer';
 
-// Native on-device speech recognition (Android SpeechRecognizer / iOS SFSpeechRecognizer).
-// Restart-on-end mimics a continuous session: each utterance ends recognition,
-// so we immediately start a new one while the mic button is toggled on.
+// Native on-device speech recognition (Android SpeechRecognizer / iOS SFSpeechRecognizer)
+// via expo-speech-recognition — the actively maintained, New-Architecture-compatible
+// replacement for @react-native-voice/voice (deprecated by its own maintainers).
 const LOCALE = 'en-US';
 const RESTART_DELAY_MS = 300;
 
-/** Android SpeechRecognizer ERROR_INSUFFICIENT_PERMISSIONS */
-const PERMISSION_ERROR_CODE = '9';
+/** Errors that mean the OS/user blocked the mic — don't auto-restart on these. */
+const BLOCKED_ERRORS = new Set(['not-allowed', 'service-not-allowed']);
+/** Recoverable errors (silence/timeout) — safe to restart if the session is still active. */
+const RECOVERABLE_ERRORS = new Set(['no-speech', 'speech-timeout', 'network']);
 
 export function useVoiceInput(onAppendText: (chunk: string) => void) {
   const [isListening, setIsListening] = useState(false);
@@ -26,81 +32,91 @@ export function useVoiceInput(onAppendText: (chunk: string) => void) {
   appendRef.current = onAppendText;
 
   useEffect(() => {
-    pushCrashDebugLine('Voice', `Voice module typeof=${typeof Voice}, isAvailable typeof=${typeof Voice?.isAvailable}`);
-    Voice.isAvailable()
-      .then((result) => {
-        pushCrashDebugLine('Voice', `isAvailable() resolved: ${JSON.stringify(result)}`);
-        setAvailable(!!result);
-      })
-      .catch((err) => {
-        pushCrashDebugLine('Voice', 'isAvailable() REJECTED (native error)', err?.message ?? String(err));
-        setAvailable(false);
-      });
-
-    Voice.onSpeechStart = () => {
-      setIsListening(true);
-      setPartialText('');
-      setHint('');
-    };
-
-    Voice.onSpeechPartialResults = (e: SpeechResultsEvent) => {
-      const text = e.value?.[0];
-      if (text) {
-        setPartialText(text);
-        partialRef.current = text;
-      }
-    };
-
-    Voice.onSpeechResults = (e: SpeechResultsEvent) => {
-      const text = e.value?.[0];
-      // Ignore finals that land after a manual stop — stopVoice already
-      // committed the partial, so appending here would duplicate the words.
-      if (text && sessionActiveRef.current) {
-        appendRef.current(text);
-        setPartialText('');
-        partialRef.current = '';
-      }
-    };
-
-    Voice.onSpeechError = (e: SpeechErrorEvent) => {
-      const code = e.error?.code ?? '';
-      const blocked = code === PERMISSION_ERROR_CODE || /permission/i.test(e.error?.message ?? '');
-      setIsListening(false);
-      setPartialText('');
-      partialRef.current = '';
-      if (blocked) {
-        sessionActiveRef.current = false;
-        setHint('Microphone access blocked. Check app permissions.');
-        return;
-      }
-      // Recoverable (no speech detected, timeout, etc.) — restart if still in an active session.
-      if (sessionActiveRef.current) {
-        setTimeout(() => {
-          if (sessionActiveRef.current) void Voice.start(LOCALE).catch(() => {});
-        }, RESTART_DELAY_MS);
-      }
-    };
-
-    Voice.onSpeechEnd = () => {
-      setIsListening(false);
-      if (sessionActiveRef.current) {
-        setTimeout(() => {
-          if (sessionActiveRef.current) void Voice.start(LOCALE).catch(() => {});
-        }, RESTART_DELAY_MS);
-      } else {
-        setHint('');
-      }
-    };
-
-    return () => {
-      sessionActiveRef.current = false;
-      void Voice.destroy().then(Voice.removeAllListeners).catch(() => {});
-    };
+    try {
+      const result = ExpoSpeechRecognitionModule.isRecognitionAvailable();
+      pushCrashDebugLine('Voice', `isRecognitionAvailable() -> ${JSON.stringify(result)}`);
+      setAvailable(!!result);
+    } catch (err) {
+      pushCrashDebugLine(
+        'Voice',
+        'isRecognitionAvailable() threw',
+        err instanceof Error ? err.message : String(err)
+      );
+      setAvailable(false);
+    }
   }, []);
 
+  const startNativeSession = useCallback(() => {
+    ExpoSpeechRecognitionModule.start({
+      lang: LOCALE,
+      interimResults: true,
+      continuous: true,
+    });
+  }, []);
+
+  useSpeechRecognitionEvent('start', () => {
+    setIsListening(true);
+    setHint('');
+  });
+
+  useSpeechRecognitionEvent('result', (e: ExpoSpeechRecognitionResultEvent) => {
+    const text = e.results?.[0]?.transcript;
+    if (!text) return;
+    if (e.isFinal) {
+      appendRef.current(text);
+      setPartialText('');
+      partialRef.current = '';
+    } else {
+      setPartialText(text);
+      partialRef.current = text;
+    }
+  });
+
+  useSpeechRecognitionEvent('error', (e: ExpoSpeechRecognitionErrorEvent) => {
+    pushCrashDebugLine('Voice', `error: ${e.error}`, e.message);
+    setIsListening(false);
+    if (BLOCKED_ERRORS.has(e.error)) {
+      sessionActiveRef.current = false;
+      setPartialText('');
+      partialRef.current = '';
+      setHint('Microphone access blocked. Check app permissions.');
+      return;
+    }
+    if (sessionActiveRef.current && RECOVERABLE_ERRORS.has(e.error)) {
+      setTimeout(() => {
+        if (sessionActiveRef.current) {
+          try {
+            startNativeSession();
+          } catch {
+            /* noop */
+          }
+        }
+      }, RESTART_DELAY_MS);
+    }
+  });
+
+  useSpeechRecognitionEvent('end', () => {
+    setIsListening(false);
+    // Continuous mode can still be ended by the OS (e.g. long silence on some
+    // OEMs) — restart transparently if the user hasn't manually stopped.
+    if (sessionActiveRef.current) {
+      setTimeout(() => {
+        if (sessionActiveRef.current) {
+          try {
+            startNativeSession();
+          } catch {
+            /* noop */
+          }
+        }
+      }, RESTART_DELAY_MS);
+    } else {
+      setHint('');
+    }
+  });
+
   const requestMic = useCallback(async () => {
-    const { status } = await Audio.requestPermissionsAsync();
-    if (status !== 'granted') {
+    const result = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!result.granted) {
       Alert.alert('Microphone', 'Permission denied. Please type your update.', [{ text: 'OK' }]);
       return false;
     }
@@ -112,7 +128,7 @@ export function useVoiceInput(onAppendText: (chunk: string) => void) {
     setIsListening(false);
     setHint('');
     try {
-      await Voice.stop();
+      ExpoSpeechRecognitionModule.stop();
     } catch {
       /* noop */
     }
@@ -142,12 +158,23 @@ export function useVoiceInput(onAppendText: (chunk: string) => void) {
     sessionActiveRef.current = true;
     setHint('');
     try {
-      await Voice.start(LOCALE);
+      startNativeSession();
     } catch {
       sessionActiveRef.current = false;
       setHint('Could not start voice recognition.');
     }
-  }, [available, stopVoice, requestMic]);
+  }, [available, stopVoice, requestMic, startNativeSession]);
+
+  useEffect(() => {
+    return () => {
+      sessionActiveRef.current = false;
+      try {
+        ExpoSpeechRecognitionModule.abort();
+      } catch {
+        /* noop */
+      }
+    };
+  }, []);
 
   return { isListening, partialText, hint, toggleListening, stopVoice, voiceView: null };
 }
